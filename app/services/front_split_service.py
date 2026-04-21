@@ -172,6 +172,50 @@ def _decontaminate_white_matte(rgba: Image.Image) -> Image.Image:
     return out
 
 
+def _suppress_border_white_fringe(rgba: Image.Image) -> Image.Image:
+    """Remove bright white fringe pixels that hug transparent background.
+
+    This is a targeted cleanup for residual white paper/background slivers that
+    remain around fingers and narrow prop gaps after alpha extraction.
+    """
+    src = rgba.convert("RGBA")
+    alpha = src.getchannel("A")
+    src_px = src.load()
+    alpha_px = alpha.load()
+    out = src.copy()
+    out_px = out.load()
+
+    for y in range(src.height):
+        for x in range(src.width):
+            r, g, b, a = src_px[x, y]
+            if a <= 0:
+                continue
+            if min(r, g, b) < 232 or max(r, g, b) - min(r, g, b) > 24:
+                continue
+
+            touches_transparent = False
+            for ny in range(max(0, y - 1), min(src.height, y + 2)):
+                for nx in range(max(0, x - 1), min(src.width, x + 2)):
+                    if nx == x and ny == y:
+                        continue
+                    if alpha_px[nx, ny] <= 6:
+                        touches_transparent = True
+                        break
+                if touches_transparent:
+                    break
+            if not touches_transparent:
+                continue
+
+            whiteness = (r + g + b) / 3
+            if whiteness >= 248:
+                out_px[x, y] = (r, g, b, 0)
+            elif whiteness >= 240:
+                out_px[x, y] = (r, g, b, min(a, 32))
+            else:
+                out_px[x, y] = (r, g, b, min(a, 72))
+    return out
+
+
 def _alpha_bbox(alpha: Image.Image) -> tuple[int, int, int, int] | None:
     bbox = alpha.getbbox()
     if not bbox:
@@ -237,6 +281,7 @@ def _build_soft_subject_rgba(img: Image.Image) -> tuple[Image.Image, Image.Image
     out = rgba.copy()
     out.putalpha(alpha)
     out = _decontaminate_white_matte(out)
+    out = _suppress_border_white_fringe(out)
     overlay = Image.new("RGBA", rgba.size, (255, 255, 255, 0))
     overlay.paste((255, 0, 0, 96), mask=hard_mask)
     return out, alpha, overlay

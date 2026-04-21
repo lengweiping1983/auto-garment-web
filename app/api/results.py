@@ -93,16 +93,9 @@ async def get_texture(task_id: str, texture_id: str):
 @router.get("/tasks/{task_id}/preview")
 async def get_preview(task_id: str, variant: str = ""):
     """Get the main preview image (PNG with transparent background)."""
-    if variant:
-        path = _task_dir(task_id) / "variants" / variant / "preview.png"
-        if path.exists():
-            return FileResponse(path, media_type="image/png")
-    path = _task_dir(task_id) / "variants" / "texture_1" / "preview.png"
-    if not path.exists():
-        for v in ["texture_1", "texture_2", "texture_3"]:
-            path = _task_dir(task_id) / "variants" / v / "preview.png"
-            if path.exists():
-                break
+    if not variant:
+        raise HTTPException(status_code=400, detail="必须指定 variant")
+    path = _task_dir(task_id) / "variants" / variant / "preview.png"
     if not path.exists():
         raise HTTPException(status_code=404, detail="预览图尚未生成")
     return FileResponse(path, media_type="image/png")
@@ -111,15 +104,9 @@ async def get_preview(task_id: str, variant: str = ""):
 @router.get("/tasks/{task_id}/front_pair_check")
 async def get_front_pair_check(task_id: str, variant: str = ""):
     """Get the front pair check image for a variant."""
-    if variant:
-        path = _task_dir(task_id) / "variants" / variant / "front_pair_check.png"
-    else:
-        path = _task_dir(task_id) / "variants" / "texture_1" / "front_pair_check.png"
-        if not path.exists():
-            for v in ["texture_1", "texture_2", "texture_3"]:
-                path = _task_dir(task_id) / "variants" / v / "front_pair_check.png"
-                if path.exists():
-                    break
+    if not variant:
+        raise HTTPException(status_code=400, detail="必须指定 variant")
+    path = _task_dir(task_id) / "variants" / variant / "front_pair_check.png"
     if not path.exists():
         raise HTTPException(status_code=404, detail="front_pair_check 不存在")
     return FileResponse(path, media_type="image/png")
@@ -128,29 +115,22 @@ async def get_front_pair_check(task_id: str, variant: str = ""):
 @router.get("/tasks/{task_id}/preview_white")
 async def get_preview_white(task_id: str, variant: str = ""):
     """Get the white-background preview image (JPG)."""
-    if variant:
-        path = _task_dir(task_id) / "variants" / variant / "preview_white.jpg"
-        if path.exists():
-            return FileResponse(path, media_type="image/jpeg")
-    path = _task_dir(task_id) / "variants" / "texture_1" / "preview_white.jpg"
-    if not path.exists():
-        for v in ["texture_1", "texture_2", "texture_3"]:
-            path = _task_dir(task_id) / "variants" / v / "preview_white.jpg"
-            if path.exists():
-                break
+    if not variant:
+        raise HTTPException(status_code=400, detail="必须指定 variant")
+    path = _task_dir(task_id) / "variants" / variant / "preview_white.jpg"
     if not path.exists():
         raise HTTPException(status_code=404, detail="白底预览图尚未生成")
     return FileResponse(path, media_type="image/jpeg")
 
 
 @router.get("/tasks/{task_id}/pieces/{piece_id}")
-async def get_piece(task_id: str, piece_id: str):
+async def get_piece(task_id: str, piece_id: str, variant: str = ""):
     """Get a single rendered piece PNG."""
-    # Search in main variant first
-    for variant in ["texture_1", "texture_2", "texture_3"]:
-        path = _task_dir(task_id) / "variants" / variant / "pieces" / f"{piece_id}.png"
-        if path.exists():
-            return FileResponse(path, media_type="image/png")
+    if not variant:
+        raise HTTPException(status_code=400, detail="必须指定 variant")
+    path = _task_dir(task_id) / "variants" / variant / "pieces" / f"{piece_id}.png"
+    if path.exists():
+        return FileResponse(path, media_type="image/png")
     raise HTTPException(status_code=404, detail="裁片不存在或尚未生成")
 
 

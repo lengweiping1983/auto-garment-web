@@ -13,6 +13,7 @@ runs the FULL preserved pipeline:
 import asyncio
 import copy
 import json
+import os
 import shutil
 from datetime import datetime
 from pathlib import Path
@@ -118,6 +119,18 @@ def _write_json(path: Path, payload: dict) -> Path:
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
     return path
+
+
+def clear_rerender_outputs(task_id: str) -> None:
+    work_dir = settings.storage_base_dir / task_id
+    variants_dir = work_dir / "variants"
+    if variants_dir.exists():
+        shutil.rmtree(variants_dir)
+
+    for filename in ("automation_summary.json", "piece_fill_plan.json", "texture_set.json"):
+        path = work_dir / filename
+        if path.exists():
+            path.unlink()
 
 
 def read_dirty_assets(task_id: str) -> dict:
@@ -288,6 +301,62 @@ def _force_fill_plan_to_single_texture(fill_plan: dict, texture_id: str) -> dict
 def _resume_variant_rendered(work_dir: Path, texture_id: str) -> bool:
     preview = work_dir / "variants" / texture_id / "preview.png"
     return preview.exists()
+
+
+def _detect_total_memory_bytes() -> int | None:
+    """Best-effort detection of total system memory."""
+    try:
+        pages = os.sysconf("SC_PHYS_PAGES")
+        page_size = os.sysconf("SC_PAGE_SIZE")
+        if isinstance(pages, int) and isinstance(page_size, int) and pages > 0 and page_size > 0:
+            return pages * page_size
+    except (AttributeError, OSError, ValueError):
+        pass
+
+    meminfo = Path("/proc/meminfo")
+    if meminfo.exists():
+        try:
+            for line in meminfo.read_text(encoding="utf-8").splitlines():
+                if line.startswith("MemTotal:"):
+                    parts = line.split()
+                    if len(parts) >= 2:
+                        return int(parts[1]) * 1024
+        except Exception:
+            pass
+    return None
+
+
+def _resolve_render_mode() -> tuple[str, dict]:
+    """Resolve render mode from config and host memory."""
+    configured = (settings.render_mode or "auto").strip().lower()
+    valid_modes = {"auto", "stream", "serial"}
+    if configured not in valid_modes:
+        configured = "auto"
+
+    total_bytes = _detect_total_memory_bytes()
+    total_gb = round(total_bytes / (1024 ** 3), 2) if total_bytes else None
+    threshold_gb = settings.low_memory_serial_render_threshold_gb
+
+    if configured == "serial":
+        mode = "serial"
+        reason = "configured_serial"
+    elif configured == "stream":
+        mode = "stream"
+        reason = "configured_stream"
+    elif total_bytes is not None and total_bytes <= threshold_gb * (1024 ** 3):
+        mode = "serial"
+        reason = "low_memory_auto_downgrade"
+    else:
+        mode = "stream"
+        reason = "auto_default"
+
+    return mode, {
+        "configured_mode": configured,
+        "resolved_mode": mode,
+        "reason": reason,
+        "total_memory_gb": total_gb,
+        "serial_threshold_gb": threshold_gb,
+    }
 
 
 async def _upload_reference_image(
@@ -502,6 +571,8 @@ async def run_pipeline(
     """Run the complete garment production pipeline with resume support and streaming variants."""
     work_dir = settings.storage_base_dir / task_id
     work_dir.mkdir(parents=True, exist_ok=True)
+    render_mode, render_runtime = _resolve_render_mode()
+    serial_rendering = render_mode == "serial"
 
     try:
         _write_status(task_id, "pending", user_prompt=user_prompt)
@@ -614,8 +685,8 @@ async def run_pipeline(
                 (prompt_dir / f"{tid}.txt").write_text(prompt_text, encoding="utf-8")
 
         # Phase 3+: AI asset generation + streaming variants
-        model = neo_model or settings.neo_ai_default_model
-        size = neo_size or settings.neo_ai_default_size
+        model = neo_model or settings.neodomain_default_model
+        size = neo_size or settings.neodomain_default_size
 
         hero_dir = work_dir / "neo_hero_motif"
         texture_root = work_dir / "neo_textures"
@@ -707,6 +778,9 @@ async def run_pipeline(
                 "phase": "rendering",
                 "completed_steps": ["vision_analysis", "prompt_generation", "neo_ai_generation", "front_split", "fill_plan"],
                 "current_step": "rendering_variants",
+                "detail": {
+                    "render_runtime": render_runtime,
+                },
             })
 
             variant_summaries = []
@@ -737,7 +811,7 @@ async def run_pipeline(
                         "渲染目录": str(variant_dir.resolve()),
                         "预览图": str((variant_dir / "preview.png").resolve()),
                         "白底预览图": str((variant_dir / "preview_white.jpg").resolve()),
-                })
+                    })
                     continue
 
                 variant_dir = work_dir / "variants" / texture_id
@@ -800,6 +874,7 @@ async def run_pipeline(
                 "裁片模板变体": variant_summaries,
                 "部分成功": False,
                 "生图错误": {"hero": None, "textures": {}},
+                "渲染模式": render_runtime,
             }
             _write_json(work_dir / "automation_summary.json", summary)
 
@@ -813,6 +888,7 @@ async def run_pipeline(
                 "completed_steps": ["vision_analysis", "prompt_generation", "neo_ai_generation", "front_split", "fill_plan", "rendering"],
                 "current_step": "completed",
                 "detail": {
+                    "render_runtime": render_runtime,
                     "reference_image": {"status": "completed"},
                     "hero_motif": {"status": ("completed" if hero_path else ("pending" if allow_missing_hero else "failed")), "path": str(hero_path) if hero_path else ""},
                     "texture_1": {"status": "completed", "path": str(texture_paths.get("texture_1", ""))},
@@ -886,14 +962,15 @@ async def run_pipeline(
                                 print(f"[WARN] Front split failed: {e}")
                             front_split_done = True
                         # Process any already-completed textures
-                        for t_tid, t_path in list(texture_paths.items()):
-                            if t_tid not in processed_variants:
-                                await _process_variant_when_ready(
-                                    t_tid, texture_paths, hero_path, front_split_assets,
-                                    prompt_map, pieces_payload, garment_map, visual,
-                                    work_dir, task_id
-                                )
-                                processed_variants.add(t_tid)
+                        for t_tid in list(texture_paths.keys()):
+                            if serial_rendering or t_tid in processed_variants:
+                                continue
+                            await _process_variant_when_ready(
+                                t_tid, texture_paths, hero_path, front_split_assets,
+                                prompt_map, pieces_payload, garment_map, visual,
+                                work_dir, task_id
+                            )
+                            processed_variants.add(t_tid)
 
                 elif task in texture_id_by_task:
                     tid = texture_id_by_task[task]
@@ -904,7 +981,7 @@ async def run_pipeline(
                     else:
                         texture_paths[tid] = result
                         print(f"[OK] Texture {tid} generated: {result}")
-                        if hero_path and front_split_done and tid not in processed_variants:
+                        if not serial_rendering and hero_path and front_split_done and tid not in processed_variants:
                             await _process_variant_when_ready(
                                 tid, texture_paths, hero_path, front_split_assets,
                                 prompt_map, pieces_payload, garment_map, visual,
@@ -918,6 +995,7 @@ async def run_pipeline(
                 "completed_steps": ["vision_analysis", "prompt_generation"],
                 "current_step": "generating_textures",
                 "detail": {
+                    "render_runtime": render_runtime,
                     "reference_image": {"status": "completed", "url": ref_url},
                         "hero_motif": {"status": "failed" if (not hero_path and hero_retried and not allow_missing_hero) else ("completed" if hero_path else ("pending" if allow_missing_hero else "running")), "path": str(hero_path) if hero_path else ""},
                         "texture_1": {"status": "completed" if "texture_1" in texture_paths else ("failed" if "texture_1" in texture_errors else "running"), "path": str(texture_paths.get("texture_1", ""))},
@@ -934,9 +1012,9 @@ async def run_pipeline(
             )
 
         # Process any textures that completed but hero was not ready at the time
-        for t_tid, t_path in list(texture_paths.items()):
-            if t_tid not in processed_variants:
-                if hero_path:
+        if not serial_rendering:
+            for t_tid in list(texture_paths.keys()):
+                if t_tid not in processed_variants and hero_path:
                     await _process_variant_when_ready(
                         t_tid, texture_paths, hero_path, front_split_assets,
                         prompt_map, pieces_payload, garment_map, visual,
@@ -1032,6 +1110,7 @@ async def run_pipeline(
             "裁片模板变体": variant_summaries,
             "部分成功": bool(texture_errors or not hero_path),
             "生图错误": {"hero": "failed" if not hero_path else None, "textures": texture_errors},
+            "渲染模式": render_runtime,
         }
         _write_json(work_dir / "automation_summary.json", summary)
 
@@ -1045,6 +1124,7 @@ async def run_pipeline(
             "completed_steps": ["vision_analysis", "prompt_generation", "neo_ai_generation", "front_split", "fill_plan", "rendering"],
             "current_step": "completed",
             "detail": {
+                "render_runtime": render_runtime,
                 "reference_image": {"status": "completed"},
                 "hero_motif": {"status": ("completed" if hero_path else ("pending" if allow_missing_hero else "failed")), "path": str(hero_path) if hero_path else ""},
                 "texture_1": {"status": "completed" if "texture_1" in texture_paths else "failed", "path": str(texture_paths.get("texture_1", ""))},

@@ -38,7 +38,9 @@ pip install -r requirements.txt
 
 ```bash
 cp .env.example .env
-# 编辑 .env，填入 LLM_API_KEY 和 NEO_AI_ACCESS_TOKEN
+# 编辑 .env，填入 LLM_API_KEY 和 NEODOMAIN_ACCESS_TOKEN
+# 可选：RENDER_MODE=auto|stream|serial
+# 可选：LOW_MEMORY_SERIAL_RENDER_THRESHOLD_GB=2.5
 ```
 
 ### 3. 启动服务
@@ -103,6 +105,13 @@ pending → analyzing (视觉分析 + 提示词生成)
 ```
 
 ## 技术说明
+
+### 低内存服务器渲染策略
+
+- 默认 `RENDER_MODE=auto`，服务会自动探测机器总内存。
+- 当总内存小于等于 `LOW_MEMORY_SERIAL_RENDER_THRESHOLD_GB`（默认 `2.5` GB）时，会自动切换到 `serial`。
+- `serial` 模式会关闭“边生图边渲染”的流式渲染，等待素材准备完成后，再按 `texture_1 → texture_2 → texture_3` 顺序串行渲染，适合 2G 服务器。
+- 如果你想强制指定模式，可以在 `.env` 里设置 `RENDER_MODE=serial` 或 `RENDER_MODE=stream`。
 
 ### 为什么去掉 LLM 的思考过程？
 

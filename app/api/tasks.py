@@ -9,7 +9,7 @@ from fastapi import APIRouter, BackgroundTasks, File, Form, HTTPException, Uploa
 
 from app.config import settings
 from app.core.image_utils import resolve_theme_image
-from app.core.pipeline import read_dirty_assets, read_task_status, run_pipeline
+from app.core.pipeline import clear_rerender_outputs, read_dirty_assets, read_task_status, run_pipeline
 from app.models.schemas import GarmentType, TaskCreateResponse, TaskStatusResponse
 
 router = APIRouter()
@@ -264,10 +264,9 @@ async def continue_render(task_id: str, background_tasks: BackgroundTasks):
     neo_model = config.get("neo_model", "")
     neo_size = config.get("neo_size", "")
     dirty_assets = read_dirty_assets(task_id)
-    target_texture_ids = ["texture_1", "texture_2", "texture_3"] if dirty_assets.get("hero") else dirty_assets.get("textures", [])
-    target_texture_ids = [tid for tid in target_texture_ids if tid in texture_paths]
-    if not target_texture_ids:
-        target_texture_ids = list(texture_paths.keys())
+    target_texture_ids = list(texture_paths.keys())
+
+    clear_rerender_outputs(task_id)
 
     # Update status before starting
     from app.core.pipeline import _write_status

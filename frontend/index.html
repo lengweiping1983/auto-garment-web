@@ -1786,12 +1786,14 @@
             const previewGrid = document.getElementById('previewGrid');
             previewGrid.innerHTML = '';
             let hasExportableResults = false;
+            let defaultVariantId = '';
 
             try {
                 const res = await fetch(`/api/v1/tasks/${currentTaskId}/summary`);
                 const summary = await res.json();
                 const variants = summary['裁片模板变体'] || [];
                 hasExportableResults = variants.length > 0;
+                defaultVariantId = variants.length ? variants[0]['纹理ID'] : '';
                 for (const v of variants) {
                     const tid = v['纹理ID'];
                     const num = _textureNumber(tid);
@@ -1824,14 +1826,18 @@
 
             const piecesGrid = document.getElementById('piecesGrid');
             piecesGrid.innerHTML = '';
-            for (let i = 1; i <= 9; i++) {
-                const pid = `piece_${String(i).padStart(3, '0')}_s`;
-                const div = document.createElement('div');
-                div.className = 'piece-thumb';
-                div.innerHTML = `
-                    <img src="/api/v1/tasks/${currentTaskId}/pieces/${pid}?t=${Date.now()}" alt="${pid}" onerror="this.parentElement.style.display='none'">
-                `;
-                piecesGrid.appendChild(div);
+            if (defaultVariantId) {
+                for (let i = 1; i <= 9; i++) {
+                    const pid = `piece_${String(i).padStart(3, '0')}_s`;
+                    const div = document.createElement('div');
+                    div.className = 'piece-thumb';
+                    div.innerHTML = `
+                        <img src="/api/v1/tasks/${currentTaskId}/pieces/${pid}?variant=${defaultVariantId}&t=${Date.now()}" alt="${pid}" onerror="this.parentElement.style.display='none'">
+                    `;
+                    piecesGrid.appendChild(div);
+                }
+            } else {
+                piecesGrid.innerHTML = '<div class="empty-state">当前没有可展示的裁片结果。</div>';
             }
             setDownloadEnabled(hasExportableResults);
             showingResults = false;

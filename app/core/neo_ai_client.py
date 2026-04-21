@@ -12,8 +12,8 @@ from app.config import settings
 
 class NeoAIClient:
     def __init__(self):
-        self.base_url = settings.neo_ai_base_url.rstrip("/")
-        self.token = settings.resolved_neo_ai_access_token
+        self.base_url = settings.neodomain_base_url.rstrip("/")
+        self.token = settings.resolved_neodomain_access_token
         self.headers = {
             "accessToken": self.token,
             "Content-Type": "application/json",
@@ -65,10 +65,10 @@ class NeoAIClient:
         """Submit generation task, return task_code."""
         print(f"[DEBUG] NeoAI token prefix: {self.token[:20]}..." if self.token else "[DEBUG] NeoAI token is EMPTY")
         payload = {
-            "modelName": model or settings.neo_ai_default_model,
+            "modelName": model or settings.neodomain_default_model,
             "prompt": prompt,
             "negativePrompt": negative_prompt,
-            "size": size or settings.neo_ai_default_size,
+            "size": size or settings.neodomain_default_size,
             "numImages": str(num_images),
             "outputFormat": "png",
             "aspectRatio": "1:1",

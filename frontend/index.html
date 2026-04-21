@@ -1,0 +1,1654 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Auto Garment Producer</title>
+    <style>
+        :root {
+            --bg: #f3f0e8;
+            --panel: rgba(255, 251, 245, 0.78);
+            --panel-strong: rgba(255, 255, 255, 0.9);
+            --panel-dark: #17191f;
+            --ink: #151821;
+            --muted: #62697a;
+            --line: rgba(21, 24, 33, 0.1);
+            --line-strong: rgba(21, 24, 33, 0.18);
+            --accent: #c65c37;
+            --accent-soft: rgba(198, 92, 55, 0.14);
+            --accent-deep: #8f3d22;
+            --shadow: 0 24px 60px rgba(48, 38, 28, 0.12);
+            --radius-xl: 32px;
+            --radius-lg: 24px;
+            --radius-md: 18px;
+            --radius-sm: 12px;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        html {
+            scroll-behavior: smooth;
+        }
+
+        body {
+            min-height: 100vh;
+            font-family: "Avenir Next", "PingFang SC", "Microsoft YaHei", "Segoe UI", sans-serif;
+            color: var(--ink);
+            line-height: 1.5;
+            background:
+                radial-gradient(circle at top left, rgba(198, 92, 55, 0.16), transparent 28%),
+                radial-gradient(circle at 85% 10%, rgba(39, 83, 74, 0.14), transparent 24%),
+                linear-gradient(180deg, #f9f5ef 0%, #f0ebe1 48%, #ece6db 100%);
+        }
+
+        body::before {
+            content: "";
+            position: fixed;
+            inset: 0;
+            pointer-events: none;
+            background-image:
+                linear-gradient(rgba(255, 255, 255, 0.12) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(255, 255, 255, 0.12) 1px, transparent 1px);
+            background-size: 56px 56px;
+            opacity: 0.24;
+            mask-image: radial-gradient(circle at center, black 45%, transparent 90%);
+        }
+
+        .app-layout {
+            display: grid;
+            grid-template-columns: minmax(288px, 340px) minmax(0, 1fr);
+            min-height: 100vh;
+            gap: 18px;
+            padding: 18px;
+        }
+
+        .sidebar,
+        .main-content {
+            min-width: 0;
+        }
+
+        .sidebar {
+            display: flex;
+            flex-direction: column;
+            gap: 14px;
+            padding: 18px;
+            border-radius: 30px;
+            background: linear-gradient(180deg, rgba(20, 23, 31, 0.94), rgba(28, 32, 41, 0.92));
+            color: #f7f2ea;
+            box-shadow: var(--shadow);
+            overflow-y: auto;
+        }
+
+        .sidebar::after {
+            content: "";
+            position: fixed;
+            left: 18px;
+            top: 18px;
+            width: min(340px, calc(100vw - 36px));
+            height: calc(100vh - 36px);
+            pointer-events: none;
+            border-radius: 30px;
+            box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08);
+        }
+
+        .main-content {
+            overflow-y: auto;
+            padding: 8px 0 12px;
+        }
+
+        .container {
+            width: min(1320px, 100%);
+            margin: 0 auto;
+            padding: 0 8px 24px;
+        }
+
+        .brand-block {
+            padding: 8px 2px 12px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+        }
+
+        .eyebrow {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 6px 10px;
+            border-radius: 999px;
+            background: rgba(255, 255, 255, 0.08);
+            color: #f2d5c5;
+            font-size: 11px;
+            letter-spacing: 0.16em;
+            text-transform: uppercase;
+        }
+
+        .brand-block h1,
+        .hero-copy h2 {
+            font-family: "Georgia", "Times New Roman", serif;
+            letter-spacing: -0.03em;
+        }
+
+        .brand-block h1 {
+            margin-top: 14px;
+            font-size: clamp(28px, 3vw, 40px);
+            line-height: 1.02;
+        }
+
+        .brand-block p {
+            margin-top: 12px;
+            color: rgba(247, 242, 234, 0.72);
+            font-size: 14px;
+        }
+
+        .workspace-meta {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 10px;
+            margin-top: 16px;
+        }
+
+        .meta-chip {
+            padding: 12px 14px;
+            border-radius: 16px;
+            background: rgba(255, 255, 255, 0.06);
+            border: 1px solid rgba(255, 255, 255, 0.06);
+        }
+
+        .meta-chip strong {
+            display: block;
+            font-size: 18px;
+            font-weight: 600;
+            color: #fff7ef;
+        }
+
+        .meta-chip span {
+            display: block;
+            margin-top: 4px;
+            font-size: 12px;
+            color: rgba(247, 242, 234, 0.62);
+        }
+
+        .card {
+            padding: 18px;
+            border-radius: 24px;
+            background: rgba(255, 255, 255, 0.06);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            backdrop-filter: blur(18px);
+        }
+
+        .card h3 {
+            font-size: 15px;
+            font-weight: 600;
+            margin-bottom: 14px;
+            color: #fff8f1;
+        }
+
+        .card-intro {
+            margin: -6px 0 14px;
+            font-size: 13px;
+            color: rgba(247, 242, 234, 0.64);
+        }
+
+        .form-group {
+            margin-bottom: 14px;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 7px;
+            font-size: 12px;
+            font-weight: 600;
+            letter-spacing: 0.06em;
+            text-transform: uppercase;
+            color: rgba(247, 242, 234, 0.76);
+        }
+
+        input[type="file"],
+        select,
+        input[type="text"] {
+            width: 100%;
+            padding: 12px 14px;
+            border: 1px solid rgba(255, 255, 255, 0.14);
+            border-radius: 14px;
+            font-size: 14px;
+            color: #f8f4ed;
+            background: rgba(255, 255, 255, 0.06);
+            outline: none;
+            transition: border-color 0.22s ease, background 0.22s ease, transform 0.22s ease;
+        }
+
+        input[type="file"] {
+            padding: 8px;
+        }
+
+        select:focus,
+        input[type="text"]:focus {
+            border-color: rgba(198, 92, 55, 0.85);
+            background: rgba(255, 255, 255, 0.1);
+            transform: translateY(-1px);
+        }
+
+        .upload-area {
+            position: relative;
+            border: 1px dashed rgba(255, 255, 255, 0.2);
+            border-radius: 20px;
+            padding: 22px 16px;
+            text-align: center;
+            cursor: pointer;
+            transition: transform 0.24s ease, border-color 0.24s ease, background 0.24s ease;
+            background:
+                linear-gradient(180deg, rgba(255, 255, 255, 0.08), rgba(255, 255, 255, 0.04)),
+                radial-gradient(circle at top, rgba(198, 92, 55, 0.18), transparent 60%);
+        }
+
+        .upload-area:hover,
+        .upload-area.dragover {
+            border-color: rgba(198, 92, 55, 0.92);
+            background:
+                linear-gradient(180deg, rgba(255, 255, 255, 0.12), rgba(255, 255, 255, 0.06)),
+                radial-gradient(circle at top, rgba(198, 92, 55, 0.22), transparent 60%);
+            transform: translateY(-2px);
+        }
+
+        .upload-area p {
+            font-size: 14px;
+            color: rgba(247, 242, 234, 0.72);
+        }
+
+        .upload-area img {
+            max-width: 100%;
+            max-height: 280px;
+            margin-top: 14px;
+            border-radius: 14px;
+            box-shadow: 0 12px 32px rgba(0, 0, 0, 0.18);
+        }
+
+        .btn {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            min-height: 48px;
+            padding: 12px 18px;
+            border: none;
+            border-radius: 999px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: transform 0.22s ease, opacity 0.22s ease, box-shadow 0.22s ease;
+        }
+
+        .btn:hover {
+            transform: translateY(-1px);
+        }
+
+        .btn:disabled {
+            opacity: 0.55;
+            cursor: not-allowed;
+            transform: none;
+            box-shadow: none;
+        }
+
+        .btn-primary {
+            width: 100%;
+            color: #fff7f0;
+            background: linear-gradient(135deg, #cb6641, #994122);
+            box-shadow: 0 12px 30px rgba(143, 61, 34, 0.28);
+        }
+
+        .btn-secondary {
+            width: 100%;
+            margin-top: 10px;
+            color: #fff1e9;
+            background: rgba(255, 255, 255, 0.08);
+            border: 1px solid rgba(255, 255, 255, 0.12);
+        }
+
+        .btn-sm {
+            min-height: 36px;
+            padding: 8px 12px;
+            font-size: 12px;
+        }
+
+        .task-list {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            max-height: 420px;
+            overflow-y: auto;
+            padding-right: 4px;
+        }
+
+        .task-item {
+            position: relative;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 10px;
+            padding: 14px;
+            border-radius: 18px;
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid rgba(255, 255, 255, 0.06);
+            cursor: pointer;
+            transition: transform 0.22s ease, background 0.22s ease, border-color 0.22s ease;
+        }
+
+        .task-delete-btn {
+            position: absolute;
+            top: 6px;
+            right: 6px;
+            width: 20px;
+            height: 20px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 50%;
+            font-size: 14px;
+            line-height: 1;
+            color: rgba(247, 242, 234, 0.5);
+            background: rgba(255, 255, 255, 0.08);
+            border: none;
+            cursor: pointer;
+            opacity: 0;
+            transition: opacity 0.2s ease, background 0.2s ease, color 0.2s ease;
+            z-index: 2;
+        }
+
+        .task-item:hover .task-delete-btn {
+            opacity: 1;
+        }
+
+        .task-delete-btn:hover {
+            background: rgba(226, 87, 87, 0.9);
+            color: #fff;
+        }
+
+        .task-item:hover {
+            transform: translateY(-2px);
+            background: rgba(255, 255, 255, 0.08);
+            border-color: rgba(255, 255, 255, 0.12);
+        }
+
+        .task-item.selected {
+            background: linear-gradient(135deg, rgba(198, 92, 55, 0.22), rgba(198, 92, 55, 0.08));
+            border-color: rgba(231, 146, 111, 0.75);
+        }
+
+        .task-info {
+            flex: 1;
+            min-width: 0;
+        }
+
+        .task-id {
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+            font-size: 13px;
+            font-weight: 600;
+            color: #fff8f1;
+        }
+
+        .task-meta {
+            margin-top: 4px;
+            font-size: 11px;
+            color: rgba(247, 242, 234, 0.56);
+        }
+
+        .task-status,
+        .ref-status {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            padding: 4px 10px;
+            border-radius: 999px;
+            font-size: 11px;
+            font-weight: 700;
+            letter-spacing: 0.04em;
+        }
+
+        .status-completed,
+        .ref-status-completed {
+            background: rgba(74, 179, 126, 0.16);
+            color: #7eedaa;
+        }
+
+        .status-failed,
+        .ref-status-failed {
+            background: rgba(226, 87, 87, 0.14);
+            color: #ffb8b8;
+        }
+
+        .status-pending,
+        .ref-status-pending {
+            background: rgba(233, 195, 94, 0.16);
+            color: #f5d78b;
+        }
+
+        .status-analyzing,
+        .status-generating,
+        .status-rendering,
+        .status-waiting_assets,
+        .ref-status-running {
+            background: rgba(107, 148, 255, 0.16);
+            color: #c2d4ff;
+        }
+
+        .status-unknown {
+            background: rgba(255, 255, 255, 0.12);
+            color: rgba(255, 248, 241, 0.76);
+        }
+
+        .hero-banner,
+        .hero-panel,
+        .surface-panel {
+            position: relative;
+            overflow: hidden;
+            border: 1px solid rgba(255, 255, 255, 0.44);
+            border-radius: var(--radius-xl);
+            background: linear-gradient(180deg, rgba(255, 251, 245, 0.88), rgba(255, 248, 242, 0.72));
+            box-shadow: var(--shadow);
+            backdrop-filter: blur(20px);
+            animation: rise-in 0.7s ease both;
+        }
+
+        .surface-panel {
+            margin-top: 18px;
+            padding: 24px;
+        }
+
+        .surface-head {
+            display: flex;
+            align-items: flex-start;
+            justify-content: space-between;
+            gap: 16px;
+            margin-bottom: 18px;
+        }
+
+        .surface-head h3,
+        .results-title {
+            font-size: 22px;
+            font-weight: 600;
+            color: #1a1e28;
+        }
+
+        .surface-head p {
+            max-width: 680px;
+            margin-top: 6px;
+            font-size: 14px;
+            color: var(--muted);
+        }
+
+        .surface-tag {
+            flex-shrink: 0;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 8px 12px;
+            border-radius: 999px;
+            font-size: 12px;
+            font-weight: 700;
+            letter-spacing: 0.04em;
+            color: var(--accent-deep);
+            background: var(--accent-soft);
+        }
+
+        .progress-shell {
+            padding: 18px 20px 20px;
+            border-radius: 24px;
+            background: linear-gradient(180deg, rgba(255, 255, 255, 0.74), rgba(255, 255, 255, 0.46));
+            border: 1px solid rgba(21, 24, 33, 0.08);
+        }
+
+        .progress-bar {
+            width: 100%;
+            height: 12px;
+            margin-top: 14px;
+            overflow: hidden;
+            border-radius: 999px;
+            background: rgba(21, 24, 33, 0.08);
+        }
+
+        .progress-bar-fill {
+            height: 100%;
+            border-radius: 999px;
+            background: linear-gradient(90deg, #c65c37, #efb286);
+            transition: width 0.3s ease;
+        }
+
+        .status-text {
+            margin-top: 12px;
+            font-size: 15px;
+            font-weight: 600;
+            color: #1d212b;
+        }
+
+        .error-text {
+            margin-top: 8px;
+            font-size: 13px;
+            color: #c84534;
+            white-space: pre-wrap;
+        }
+
+        .reference-grid {
+            display: grid;
+            grid-template-columns: repeat(5, minmax(0, 1fr));
+            gap: 14px;
+        }
+
+        .reference-item,
+        .preview-item,
+        .piece-thumb {
+            position: relative;
+            overflow: hidden;
+            border-radius: 24px;
+            border: 1px solid rgba(21, 24, 33, 0.08);
+            background: linear-gradient(180deg, rgba(255, 255, 255, 0.72), rgba(255, 255, 255, 0.44));
+            transition: transform 0.24s ease, box-shadow 0.24s ease, border-color 0.24s ease;
+        }
+
+        .reference-item:hover,
+        .preview-item:hover,
+        .piece-thumb:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 20px 34px rgba(49, 39, 30, 0.1);
+            border-color: rgba(198, 92, 55, 0.24);
+        }
+
+        .reference-item {
+            min-height: 270px;
+            padding: 14px;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        .ref-label {
+            font-size: 13px;
+            font-weight: 700;
+            color: #1d212b;
+        }
+
+        .ref-status {
+            width: fit-content;
+        }
+
+        .reference-item img,
+        .preview-item img,
+        .piece-thumb img {
+            width: 100%;
+            display: block;
+            object-fit: contain;
+            background:
+                linear-gradient(180deg, rgba(255, 250, 246, 0.68), rgba(245, 240, 233, 0.5)),
+                repeating-linear-gradient(45deg, rgba(255, 255, 255, 0.36), rgba(255, 255, 255, 0.36) 10px, rgba(244, 238, 230, 0.56) 10px, rgba(244, 238, 230, 0.56) 20px);
+        }
+
+        .reference-item img {
+            flex: 1;
+            min-height: 0;
+            border-radius: 16px;
+            min-height: 180px;
+            max-height: 180px;
+        }
+
+        .ref-placeholder,
+        .empty-state {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 18px;
+            text-align: center;
+            color: rgba(21, 24, 33, 0.54);
+            background:
+                linear-gradient(180deg, rgba(255, 250, 246, 0.76), rgba(244, 238, 231, 0.68)),
+                repeating-linear-gradient(45deg, rgba(255, 255, 255, 0.34), rgba(255, 255, 255, 0.34) 10px, rgba(241, 234, 224, 0.6) 10px, rgba(241, 234, 224, 0.6) 20px);
+        }
+
+        .ref-placeholder {
+            flex: 1;
+            min-height: 180px;
+            padding: 16px;
+            font-size: 14px;
+        }
+
+        .upload-trigger {
+            cursor: pointer;
+            transition: background 0.2s, box-shadow 0.2s;
+        }
+        .upload-trigger:hover {
+            background: #e5e5ea;
+            box-shadow: inset 0 0 0 2px #007aff;
+        }
+
+        .continue-preview {
+            cursor: default !important;
+            min-height: auto !important;
+            padding: 14px !important;
+        }
+
+        .continue-preview img {
+            display: block;
+            margin: 0 auto;
+            max-height: 220px;
+        }
+
+        .results {
+            display: grid;
+            grid-template-columns: minmax(0, 1.25fr) minmax(320px, 0.75fr);
+            gap: 18px;
+            margin-top: 18px;
+        }
+
+        .results-column {
+            display: flex;
+            flex-direction: column;
+            gap: 18px;
+        }
+
+        .preview-grid {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 14px;
+        }
+
+        .preview-item {
+            padding: 14px;
+        }
+
+        .preview-item img {
+            aspect-ratio: 1 / 1;
+            border-radius: 18px;
+        }
+
+        .preview-item h4 {
+            margin-top: 12px;
+            font-size: 14px;
+            color: #1f2430;
+        }
+
+        .pieces-grid {
+            display: grid;
+            grid-template-columns: repeat(3, minmax(0, 1fr));
+            gap: 12px;
+        }
+
+        .piece-thumb {
+            padding: 10px;
+        }
+
+        .piece-thumb img {
+            aspect-ratio: 1 / 1;
+            border-radius: 16px;
+        }
+
+        .download-wrap {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 16px;
+            padding: 18px 20px;
+            border-radius: 24px;
+            background: linear-gradient(135deg, rgba(24, 28, 37, 0.96), rgba(39, 43, 51, 0.94));
+            color: #fff8f0;
+        }
+
+        .download-wrap p {
+            font-size: 13px;
+            color: rgba(255, 247, 239, 0.64);
+        }
+
+        .download-wrap .btn-primary {
+            width: auto;
+            min-width: 180px;
+        }
+
+        .empty-state {
+            width: 100%;
+            min-height: 240px;
+            padding: 28px;
+            font-size: 14px;
+        }
+
+        .hidden {
+            display: none !important;
+        }
+
+        .lightbox {
+            display: none;
+            position: fixed;
+            inset: 0;
+            z-index: 1000;
+            align-items: center;
+            justify-content: center;
+            flex-direction: column;
+            background: rgba(8, 9, 14, 0.92);
+        }
+
+        .lightbox.active {
+            display: flex;
+        }
+
+        .lightbox img {
+            max-width: min(92vw, 1320px);
+            max-height: 86vh;
+            border-radius: 22px;
+            object-fit: contain;
+            box-shadow: 0 30px 80px rgba(0, 0, 0, 0.34);
+        }
+
+        .lightbox-close {
+            position: absolute;
+            top: 16px;
+            right: 22px;
+            width: 48px;
+            height: 48px;
+            display: inline-grid;
+            place-items: center;
+            border-radius: 50%;
+            font-size: 28px;
+            color: #fff;
+            cursor: pointer;
+            user-select: none;
+            background: rgba(255, 255, 255, 0.08);
+            transition: background 0.2s ease;
+        }
+
+        .lightbox-close:hover {
+            background: rgba(255, 255, 255, 0.18);
+        }
+
+        @keyframes rise-in {
+            from {
+                opacity: 0;
+                transform: translateY(18px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        @media (max-width: 1180px) {
+            .app-layout {
+                grid-template-columns: 1fr;
+            }
+
+            .results {
+                grid-template-columns: 1fr;
+            }
+
+            .reference-grid {
+                grid-template-columns: repeat(2, minmax(0, 1fr));
+            }
+        }
+
+        @media (max-width: 720px) {
+            .app-layout {
+                padding: 12px;
+                gap: 12px;
+            }
+
+            .sidebar,
+            .surface-panel,
+            .hero-panel {
+                border-radius: 24px;
+            }
+
+            .container {
+                padding: 0;
+            }
+
+            .reference-grid,
+            .preview-grid,
+            .pieces-grid,
+            .workspace-meta {
+                grid-template-columns: 1fr;
+            }
+
+            .download-wrap {
+                flex-direction: column;
+                align-items: stretch;
+            }
+
+            .download-wrap .btn-primary {
+                width: 100%;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="app-layout">
+        <aside class="sidebar">
+            <div class="brand-block">
+                <span class="eyebrow">Auto Garment Producer</span>
+                <h1>从主题图到可生产裁片的成衣工作台</h1>
+                <p>把参考图、风格提示和 AI 生成资产收束成一条连续的生产链，而不是零散步骤。</p>
+                <div class="workspace-meta">
+                    <div class="meta-chip">
+                        <strong id="taskCountBadge">0</strong>
+                        <span>历史任务</span>
+                    </div>
+                    <div class="meta-chip">
+                        <strong id="activeTaskBadge">空闲</strong>
+                        <span>当前状态</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card" id="newTaskCard">
+                <h3>新建任务</h3>
+                <p class="card-intro">上传主题图，选择服装类型，然后直接启动这次成衣生成流程。</p>
+
+                <div class="form-group">
+                    <label>主题图</label>
+                    <div class="upload-area" id="uploadArea">
+                        <p>拖拽图片到这里，或点击上传一张参考图</p>
+                        <input type="file" id="themeImage" accept="image/*" style="display:none">
+                        <div id="imagePreview"></div>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label for="garmentType">服装类型</label>
+                    <select id="garmentType">
+                        <option value="T恤">T恤 / T-shirt / 衬衫</option>
+                        <option value="防晒服">防晒服 / 防晒衣</option>
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label for="userPrompt">用户提示（可选）</label>
+                    <input type="text" id="userPrompt" placeholder="例如：水彩花卉、童话森林、轻户外机能">
+                </div>
+
+                <div class="form-group hidden">
+                    <label for="neoModel">生图模型（可选）</label>
+                    <input type="text" id="neoModel" placeholder="gemini-3-pro-image-preview">
+                </div>
+
+                <div class="form-group hidden">
+                    <label for="neoSize">尺寸（可选）</label>
+                    <input type="text" id="neoSize" placeholder="2K">
+                </div>
+
+                <button class="btn btn-primary" id="submitBtn" onclick="submitTask()">开始生成</button>
+            </div>
+
+            <div class="card hidden" id="continueTaskCard">
+                <h3>继续任务</h3>
+                <p class="card-intro">从历史任务继续补图、重试或推进当前生产链。</p>
+
+                <div class="form-group">
+                    <label>主题图</label>
+                    <div class="upload-area continue-preview" id="continueUploadArea">
+                        <p id="continueImagePlaceholder" style="color:rgba(247, 242, 234, 0.72);">加载中...</p>
+                        <img id="continueThemeImage" src="" alt="主题图" style="max-width:100%; max-height:200px; border-radius:14px; display:none;">
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label for="garmentTypeContinue">服装类型</label>
+                    <select id="garmentTypeContinue">
+                        <option value="T恤">T恤 / T-shirt / 衬衫</option>
+                        <option value="防晒服">防晒服 / 防晒衣</option>
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label for="userPromptContinue">用户提示（可选）</label>
+                    <input type="text" id="userPromptContinue" placeholder="例如：强化插画感、改成柔和配色">
+                </div>
+
+                <div class="form-group hidden">
+                    <label for="neoModelContinue">生图模型（可选）</label>
+                    <input type="text" id="neoModelContinue" placeholder="gemini-3-pro-image-preview">
+                </div>
+
+                <div class="form-group hidden">
+                    <label for="neoSizeContinue">尺寸（可选）</label>
+                    <input type="text" id="neoSizeContinue" placeholder="2K">
+                </div>
+
+                <button class="btn btn-primary" id="retryBtn" onclick="retryTask()" disabled>继续执行</button>
+                <button class="btn btn-secondary" onclick="switchMode('new')">返回新建</button>
+            </div>
+
+            <div class="card" id="taskListCard">
+                <h3>已有任务</h3>
+                <p class="card-intro">选中一个任务后，右侧会切换到它的进度、素材和结果。</p>
+                <div class="task-list" id="taskList">
+                    <p style="color:rgba(247,242,234,0.64);font-size:14px;">加载中...</p>
+                </div>
+            </div>
+        </aside>
+
+        <main class="main-content">
+            <div class="container">
+                <section class="surface-panel hidden" id="progressCard">
+                    <div class="surface-head">
+                        <div>
+                            <h3>生产状态</h3>
+                            <p>用一条明确的进度条和状态文本追踪这次任务当前进行到了哪一步。</p>
+                        </div>
+                        <div class="surface-tag">Live Status</div>
+                    </div>
+
+                    <div class="progress-shell">
+                        <div class="progress-bar">
+                            <div class="progress-bar-fill" id="progressFill" style="width:0%"></div>
+                        </div>
+                        <div class="status-text" id="statusText">等待中...</div>
+                        <div class="error-text hidden" id="errorText"></div>
+                    </div>
+                </section>
+
+                <section class="surface-panel hidden" id="referenceImagesCard">
+                    <div class="surface-head">
+                        <div>
+                            <h3>参考图与中间素材</h3>
+                            <p>这里集中放主题图、主图和三组纹理。</p>
+                        </div>
+                        <div class="surface-tag">Asset Board</div>
+                    </div>
+
+                    <div class="reference-grid" id="referenceImagesGrid">
+                        <div class="reference-item" data-type="theme">
+                            <div class="ref-label">主题图（参考）</div>
+                            <img id="refThemeImg" src="" alt="主题图" style="display:none;">
+                            <div class="ref-placeholder" id="refThemePlaceholder">等待上传...</div>
+                            <div class="ref-status ref-status-pending" id="refThemeStatus">等待上传</div>
+                        </div>
+
+                        <div class="reference-item" data-type="hero">
+                            <div class="ref-label">主图</div>
+                            <img id="refHeroImg" src="" alt="主图" style="display:none;">
+                            <div class="ref-placeholder upload-trigger" id="refHeroPlaceholder" onclick="triggerAssetUpload('hero')">等待生成...</div>
+                            <div class="ref-status ref-status-pending" id="refHeroStatus">等待中</div>
+                        </div>
+
+                        <div class="reference-item" data-type="main">
+                            <div class="ref-label">纹理 1</div>
+                            <img id="refMainImg" src="" alt="纹理1" style="display:none;">
+                            <div class="ref-placeholder upload-trigger" id="refMainPlaceholder" onclick="triggerAssetUpload('main')">等待生成...</div>
+                            <div class="ref-status ref-status-pending" id="refMainStatus">等待中</div>
+                        </div>
+
+                        <div class="reference-item" data-type="secondary">
+                            <div class="ref-label">纹理 2</div>
+                            <img id="refSecondaryImg" src="" alt="纹理2" style="display:none;">
+                            <div class="ref-placeholder upload-trigger" id="refSecondaryPlaceholder" onclick="triggerAssetUpload('secondary')">等待生成...</div>
+                            <div class="ref-status ref-status-pending" id="refSecondaryStatus">等待中</div>
+                        </div>
+
+                        <div class="reference-item" data-type="accent_light">
+                            <div class="ref-label">纹理 3</div>
+                            <img id="refAccent_lightImg" src="" alt="纹理3" style="display:none;">
+                            <div class="ref-placeholder upload-trigger" id="refAccent_lightPlaceholder" onclick="triggerAssetUpload('accent_light')">等待生成...</div>
+                            <div class="ref-status ref-status-pending" id="refAccent_lightStatus">等待中</div>
+                        </div>
+                        <input type="file" id="assetFileInput" accept="image/*" style="display:none" onchange="handleAssetUpload(this)">
+                    </div>
+                </section>
+
+                <section class="results" id="resultsCard">
+                    <div class="results-column">
+                        <div class="surface-panel">
+                            <div class="surface-head">
+                                <div>
+                                    <h3 class="results-title">生成结果</h3>
+                                    <p>查看对位检查图和白底预览，快速确认不同纹理版本是否已经到可审查状态。</p>
+                                </div>
+                                <div class="surface-tag">Variant Review</div>
+                            </div>
+                            <div class="preview-grid" id="previewGrid">
+                                <div class="empty-state">这里会显示每个纹理版本的对位检查图和白底预览。</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="results-column">
+                        <div class="surface-panel">
+                            <div class="surface-head">
+                                <div>
+                                    <h3 class="results-title">裁片预览</h3>
+                                    <p>主裁片会按部件拆开展示，方便快速排查局部纹理效果。</p>
+                                </div>
+                                <div class="surface-tag">Piece Detail</div>
+                            </div>
+                            <div class="pieces-grid" id="piecesGrid">
+                                <div class="empty-state">任务完成后，这里会自动填充裁片缩略图。</div>
+                            </div>
+                        </div>
+
+                        <div class="download-wrap">
+                            <div>
+                                <strong style="display:block; font-size:20px;">导出完整结果包</strong>
+                                <p>下载 ZIP，带走本次任务生成的全部关键产物。</p>
+                            </div>
+                            <button class="btn btn-primary" onclick="downloadResults()">下载结果 (ZIP)</button>
+                        </div>
+                    </div>
+                </section>
+            </div>
+        </main>
+    </div>
+
+    <div class="lightbox" id="lightbox" onclick="if(event.target===this)closeLightbox()">
+        <span class="lightbox-close" onclick="closeLightbox()">&times;</span>
+        <img id="lightboxImg" src="" alt="">
+    </div>
+
+    <script>
+        let currentTaskId = null;
+        let selectedTaskId = null;
+        let pollInterval = null;
+
+        function phaseDisplayName(status) {
+            return {
+                pending: '等待中',
+                analyzing: '分析中',
+                generating: '生图中',
+                rendering: '渲染中',
+                completed: '已完成',
+                failed: '失败',
+                waiting_assets: '待补图',
+            }[status] || '空闲';
+        }
+
+        function updateWorkspaceHero(taskLabel, phase, hint) {
+            const currentTaskLabelEl = document.getElementById('currentTaskLabel');
+            const currentTaskMetaEl = document.getElementById('currentTaskMeta');
+            const workspaceHintEl = document.getElementById('workspaceHint');
+            const activeTaskBadgeEl = document.getElementById('activeTaskBadge');
+
+            if (currentTaskLabelEl) {
+                currentTaskLabelEl.textContent = taskLabel || '等待新建';
+            }
+            if (currentTaskMetaEl) {
+                currentTaskMetaEl.textContent = phaseDisplayName(phase);
+            }
+            if (activeTaskBadgeEl) {
+                activeTaskBadgeEl.textContent = phaseDisplayName(phase);
+            }
+            if (workspaceHintEl && hint) {
+                workspaceHintEl.textContent = hint;
+            }
+        }
+
+        function openLightbox(src) {
+            document.getElementById('lightboxImg').src = src;
+            document.getElementById('lightbox').classList.add('active');
+        }
+
+        function closeLightbox() {
+            document.getElementById('lightbox').classList.remove('active');
+            document.getElementById('lightboxImg').src = '';
+        }
+
+        document.addEventListener('click', (e) => {
+            if (e.target.tagName === 'IMG' && !e.target.closest('.lightbox')) {
+                openLightbox(e.target.src);
+            }
+        });
+
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape') closeLightbox();
+        });
+
+        loadTasks();
+
+        const uploadArea = document.getElementById('uploadArea');
+        const fileInput = document.getElementById('themeImage');
+        const imagePreview = document.getElementById('imagePreview');
+
+        uploadArea.addEventListener('click', () => fileInput.click());
+        uploadArea.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            uploadArea.classList.add('dragover');
+        });
+        uploadArea.addEventListener('dragleave', () => uploadArea.classList.remove('dragover'));
+        uploadArea.addEventListener('drop', (e) => {
+            e.preventDefault();
+            uploadArea.classList.remove('dragover');
+            const files = e.dataTransfer.files;
+            if (files.length) {
+                fileInput.files = files;
+                showPreview(files[0]);
+            }
+        });
+        fileInput.addEventListener('change', () => {
+            if (fileInput.files.length) showPreview(fileInput.files[0]);
+        });
+
+        function showPreview(file) {
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                imagePreview.innerHTML = `<img src="${e.target.result}" alt="preview">`;
+            };
+            reader.readAsDataURL(file);
+        }
+
+        function switchMode(mode) {
+            document.getElementById('newTaskCard').classList.toggle('hidden', mode !== 'new');
+            document.getElementById('continueTaskCard').classList.toggle('hidden', mode !== 'continue');
+            if (mode === 'new') {
+                selectedTaskId = null;
+                document.querySelectorAll('.task-item').forEach(el => el.classList.remove('selected'));
+                document.getElementById('retryBtn').disabled = true;
+                document.getElementById('continueThemeImage').style.display = 'none';
+                document.getElementById('continueThemeImage').src = '';
+                document.getElementById('continueImagePlaceholder').textContent = '加载中...';
+                document.getElementById('progressCard').classList.add('hidden');
+                document.getElementById('referenceImagesCard').classList.add('hidden');
+                document.getElementById('resultsCard').style.display = 'grid';
+                document.getElementById('errorText').classList.add('hidden');
+                document.getElementById('errorText').textContent = '';
+                updateWorkspaceHero('等待新建', 'idle', '上传灵感图，系统会依次完成分析、生图、纹理生成和裁片渲染。你在这里可以看到整条生产链的状态。');
+            }
+        }
+
+        async function loadTasks() {
+            try {
+                const res = await fetch('/api/v1/tasks');
+                const data = await res.json();
+                const listEl = document.getElementById('taskList');
+                const countEl = document.getElementById('taskCountBadge');
+                countEl.textContent = String((data.tasks || []).length);
+                if (!data.tasks || data.tasks.length === 0) {
+                    listEl.innerHTML = '<p style="color:rgba(247,242,234,0.64);font-size:14px;">暂无历史任务</p>';
+                    return;
+                }
+                listEl.innerHTML = '';
+                for (const task of data.tasks) {
+                    const statusClass = 'status-' + (task.status || 'unknown');
+                    const statusName = {
+                        completed: '已完成',
+                        failed: '失败',
+                        pending: '等待中',
+                        analyzing: '分析中',
+                        generating: '生图中',
+                        rendering: '渲染中',
+                        waiting_assets: '待补图',
+                        unknown: '未知',
+                    }[task.status] || task.status;
+                    const div = document.createElement('div');
+                    div.className = 'task-item';
+                    div.dataset.taskId = task.task_id;
+                    div.onclick = (e) => {
+                        if (e.target.closest('.task-delete-btn')) return;
+                        selectTask(task.task_id);
+                    };
+                    div.innerHTML = `
+                        <button class="task-delete-btn" title="删除任务" onclick="event.stopPropagation(); deleteTask('${task.task_id}')">&times;</button>
+                        <div class="task-info">
+                            <div class="task-id">${task.display_name || task.task_id}</div>
+                            <div class="task-meta">${task.updated_at ? task.updated_at.replace('T', ' ').substring(0, 19) : ''}</div>
+                        </div>
+                        <span class="task-status ${statusClass}">${statusName}</span>
+                    `;
+                    listEl.appendChild(div);
+                }
+            } catch (err) {
+                document.getElementById('taskList').innerHTML = '<p style="color:rgba(247,242,234,0.64);font-size:14px;">加载失败</p>';
+            }
+        }
+
+        async function selectTask(taskId) {
+            selectedTaskId = taskId;
+            currentTaskId = taskId;
+            document.querySelectorAll('.task-item').forEach(el => el.classList.remove('selected'));
+            const el = document.querySelector(`.task-item[data-task-id="${taskId}"]`);
+            if (el) el.classList.add('selected');
+            document.getElementById('retryBtn').disabled = false;
+            document.getElementById('resultsCard').style.display = 'grid';
+            updateWorkspaceHero(taskId, 'pending', '正在读取任务详情与主题图。右侧会切换到当前任务的完整上下文。');
+
+            const img = document.getElementById('continueThemeImage');
+            const placeholder = document.getElementById('continueImagePlaceholder');
+            img.style.display = 'none';
+            placeholder.textContent = '加载中...';
+            placeholder.style.display = 'block';
+
+            try {
+                const res = await fetch(`/api/v1/tasks/${taskId}/theme_image`);
+                if (res.ok) {
+                    const blob = await res.blob();
+                    const url = URL.createObjectURL(blob);
+                    img.src = url;
+                    img.style.display = 'block';
+                    placeholder.style.display = 'none';
+                } else {
+                    placeholder.textContent = '主题图加载失败';
+                }
+            } catch (err) {
+                placeholder.textContent = '主题图加载失败';
+            }
+
+            try {
+                const res = await fetch(`/api/v1/tasks/${taskId}`);
+                const data = await res.json();
+                if (res.ok) {
+                    document.getElementById('progressCard').classList.remove('hidden');
+                    document.getElementById('referenceImagesCard').classList.remove('hidden');
+                    updateProgress(data);
+                    updateReferenceImages(taskId, data.progress, data.status);
+                    if (data.status === 'completed') {
+                        showResults();
+                    } else if (data.status === 'pending' || data.status === 'analyzing' || data.status === 'generating' || data.status === 'rendering' || data.status === 'waiting_assets') {
+                        document.getElementById('previewGrid').innerHTML = '<div class="empty-state">任务处理中，预览图会在完成后自动刷新。</div>';
+                        document.getElementById('piecesGrid').innerHTML = '<div class="empty-state">任务处理中，裁片缩略图会在完成后自动刷新。</div>';
+                        startPolling();
+                    } else {
+                        document.getElementById('previewGrid').innerHTML = '<div class="empty-state">暂无结果</div>';
+                        document.getElementById('piecesGrid').innerHTML = '<div class="empty-state">暂无结果</div>';
+                    }
+                }
+            } catch (err) {
+                console.error(err);
+            }
+
+            switchMode('continue');
+        }
+
+        async function submitTask() {
+            if (!fileInput.files.length) {
+                alert('请先上传主题图');
+                return;
+            }
+            const btn = document.getElementById('submitBtn');
+            btn.disabled = true;
+            btn.textContent = '提交中...';
+            updateWorkspaceHero('提交新任务', 'pending', '新任务已开始排队，接下来会依次进入分析和生图流程。');
+
+            const form = new FormData();
+            form.append('theme_image', fileInput.files[0]);
+            form.append('garment_type', document.getElementById('garmentType').value);
+            form.append('user_prompt', document.getElementById('userPrompt').value);
+            form.append('neo_model', document.getElementById('neoModel').value);
+            form.append('neo_size', document.getElementById('neoSize').value);
+
+            try {
+                const res = await fetch('/api/v1/tasks', { method: 'POST', body: form });
+                const data = await res.json();
+                if (!res.ok) throw new Error(data.detail || '提交失败');
+                currentTaskId = data.task_id;
+                document.getElementById('progressCard').classList.remove('hidden');
+                document.getElementById('referenceImagesCard').classList.remove('hidden');
+                document.getElementById('resultsCard').style.display = 'grid';
+                document.getElementById('previewGrid').innerHTML = '<div class="empty-state">任务已提交，系统会在完成后填充这里的结果。</div>';
+                document.getElementById('piecesGrid').innerHTML = '<div class="empty-state">任务已提交，裁片缩略图会在渲染后出现。</div>';
+                resetReferenceImages();
+                loadTasks();
+                startPolling();
+            } catch (err) {
+                alert('错误: ' + err.message);
+                btn.disabled = false;
+                btn.textContent = '开始生成';
+                updateWorkspaceHero('等待新建', 'idle', '上传灵感图，系统会依次完成分析、生图、纹理生成和裁片渲染。你在这里可以看到整条生产链的状态。');
+            }
+        }
+
+        async function retryTask() {
+            if (!selectedTaskId) {
+                alert('请先选择一个任务');
+                return;
+            }
+            const btn = document.getElementById('retryBtn');
+            btn.disabled = true;
+            btn.textContent = '提交中...';
+            updateWorkspaceHero(selectedTaskId, 'pending', '继续执行已选任务，系统会在已有上下文基础上继续往下跑。');
+
+            const form = new FormData();
+            form.append('garment_type', document.getElementById('garmentTypeContinue').value);
+            form.append('user_prompt', document.getElementById('userPromptContinue').value);
+            form.append('neo_model', document.getElementById('neoModelContinue').value);
+            form.append('neo_size', document.getElementById('neoSizeContinue').value);
+
+            try {
+                const res = await fetch(`/api/v1/tasks/${selectedTaskId}/retry`, { method: 'POST', body: form });
+                const data = await res.json();
+                if (!res.ok) throw new Error(data.detail || '提交失败');
+                currentTaskId = data.task_id;
+                document.getElementById('progressCard').classList.remove('hidden');
+                document.getElementById('referenceImagesCard').classList.remove('hidden');
+                document.getElementById('resultsCard').style.display = 'grid';
+                document.getElementById('previewGrid').innerHTML = '<div class="empty-state">继续任务已提交，新的预览图会在完成后刷新。</div>';
+                document.getElementById('piecesGrid').innerHTML = '<div class="empty-state">继续任务已提交，裁片缩略图会在渲染后刷新。</div>';
+                resetReferenceImages();
+                loadTasks();
+                startPolling();
+            } catch (err) {
+                alert('错误: ' + err.message);
+                btn.disabled = false;
+                btn.textContent = '继续执行';
+            }
+        }
+
+        function startPolling() {
+            if (pollInterval) clearInterval(pollInterval);
+            pollInterval = setInterval(pollStatus, 3000);
+            pollStatus();
+        }
+
+        async function pollStatus() {
+            if (!currentTaskId) return;
+            try {
+                const res = await fetch(`/api/v1/tasks/${currentTaskId}`);
+                const data = await res.json();
+                updateProgress(data);
+                updateReferenceImages(currentTaskId, data.progress, data.status);
+                if (data.status === 'completed' || data.status === 'failed') {
+                    clearInterval(pollInterval);
+                    pollInterval = null;
+                    loadTasks();
+                    if (data.status === 'completed') showResults();
+                }
+            } catch (err) {
+                console.error(err);
+            }
+        }
+
+        function resetReferenceImages() {
+            const themeImg = document.getElementById('refThemeImg');
+            const themePlaceholder = document.getElementById('refThemePlaceholder');
+            themeImg.style.display = 'none';
+            themeImg.src = '';
+            themePlaceholder.style.display = 'flex';
+            themePlaceholder.textContent = '等待上传...';
+            document.getElementById('refThemeStatus').textContent = '等待上传';
+            document.getElementById('refThemeStatus').className = 'ref-status ref-status-pending';
+
+            ['hero', 'main', 'secondary', 'accent_light'].forEach(type => {
+                const cap = type.charAt(0).toUpperCase() + type.slice(1);
+                const img = document.getElementById('ref' + cap + 'Img');
+                const placeholder = document.getElementById('ref' + cap + 'Placeholder');
+                const status = document.getElementById('ref' + cap + 'Status');
+                img.style.display = 'none';
+                img.src = '';
+                placeholder.style.display = 'flex';
+                placeholder.textContent = '等待生成...';
+                status.textContent = '等待中';
+                status.className = 'ref-status ref-status-pending';
+            });
+        }
+
+        function updateReferenceImageItem(type, statusInfo, imageUrl, globalStatus) {
+            const cap = type.charAt(0).toUpperCase() + type.slice(1);
+            const img = document.getElementById('ref' + cap + 'Img');
+            const placeholder = document.getElementById('ref' + cap + 'Placeholder');
+            const statusEl = document.getElementById('ref' + cap + 'Status');
+
+            let st = 'pending';
+            if (typeof statusInfo === 'string') {
+                st = statusInfo;
+            } else if (statusInfo && statusInfo.status) {
+                st = statusInfo.status;
+            }
+
+            const isWaitingAssets = globalStatus === 'waiting_assets';
+            statusEl.textContent = {
+                pending: isWaitingAssets ? '等待上传' : '等待中',
+                running: '生成中',
+                uploading: '上传中',
+                completed: '已完成',
+                failed: '失败',
+            }[st] || st;
+            statusEl.className = 'ref-status ref-status-' + st;
+
+            if (st === 'completed' && imageUrl) {
+                const newSrc = imageUrl + '?t=' + Date.now();
+                if (!img.src || img.src.split('?')[0] !== imageUrl) {
+                    img.onerror = function() {
+                        img.style.display = 'none';
+                        placeholder.style.display = 'flex';
+                        placeholder.textContent = '暂无图片';
+                    };
+                    img.onload = function() {
+                        img.style.display = 'block';
+                        placeholder.style.display = 'none';
+                    };
+                    img.src = newSrc;
+                } else {
+                    // Already showing correct image, ensure visibility
+                    img.style.display = 'block';
+                    placeholder.style.display = 'none';
+                }
+            } else if (st === 'failed') {
+                placeholder.style.display = 'flex';
+                placeholder.textContent = '生成失败';
+                img.style.display = 'none';
+                img.src = '';
+            } else {
+                placeholder.style.display = 'flex';
+                if (st === 'running') {
+                    placeholder.textContent = '生成中...';
+                } else if (isWaitingAssets) {
+                    placeholder.textContent = '点击上传';
+                } else {
+                    placeholder.textContent = '等待生成...';
+                }
+                img.style.display = 'none';
+                img.src = '';
+            }
+        }
+
+        async function updateReferenceImages(taskId, progress, globalStatus) {
+            if (!taskId) return;
+            const detail = (progress && progress.detail) || {};
+
+            const themeImg = document.getElementById('refThemeImg');
+            const themePlaceholder = document.getElementById('refThemePlaceholder');
+            const themeUrl = `/api/v1/tasks/${taskId}/theme_image`;
+            if (!themeImg.src || themeImg.src.split('?')[0] !== themeUrl) {
+                themeImg.onerror = function() {
+                    themeImg.style.display = 'none';
+                    themePlaceholder.style.display = 'flex';
+                    themePlaceholder.textContent = '暂无主题图';
+                };
+                themeImg.onload = function() {
+                    themeImg.style.display = 'block';
+                    themePlaceholder.style.display = 'none';
+                };
+                themeImg.src = themeUrl + '?t=' + Date.now();
+            }
+            const refStatus = detail.reference_image;
+            let themeSt = 'pending';
+            if (typeof refStatus === 'string') {
+                themeSt = refStatus;
+            } else if (refStatus && refStatus.status) {
+                themeSt = refStatus.status;
+            }
+            const themeStatusEl = document.getElementById('refThemeStatus');
+            themeStatusEl.textContent = {
+                pending: '等待上传',
+                uploading: '上传中',
+                completed: '已上传',
+                failed: '上传失败',
+            }[themeSt] || themeSt;
+            themeStatusEl.className = 'ref-status ref-status-' + themeSt;
+
+            updateReferenceImageItem('hero', detail.hero_motif, `/api/v1/tasks/${taskId}/hero_motif`, globalStatus);
+            updateReferenceImageItem('main', detail.main, `/api/v1/tasks/${taskId}/textures/main`, globalStatus);
+            updateReferenceImageItem('secondary', detail.secondary, `/api/v1/tasks/${taskId}/textures/secondary`, globalStatus);
+            updateReferenceImageItem('accent_light', detail.accent_light, `/api/v1/tasks/${taskId}/textures/accent_light`, globalStatus);
+        }
+
+        function updateProgress(data) {
+            const phases = ['pending', 'analyzing', 'generating', 'rendering', 'completed'];
+            const phase = data.status;
+            const idx = phases.indexOf(phase);
+            let pct = phase === 'failed' ? 0 : Math.min(100, Math.max(5, (idx / 4) * 100));
+
+            const currentStep = (data.progress && data.progress.current_step) || '';
+            let statusText = '';
+            if (phase === 'waiting_assets') {
+                statusText = '等待上传资源...';
+                pct = 40;
+            } else if (phase === 'generating' && currentStep.startsWith('uploading')) {
+                statusText = '上传参考图中...';
+                pct = Math.min(45, Math.max(35, pct));
+            } else {
+                const phaseNames = {
+                    pending: '等待中...',
+                    analyzing: '视觉分析中...',
+                    generating: 'AI 生图中...',
+                    rendering: '渲染裁片中...',
+                    completed: '已完成',
+                    failed: '失败',
+                };
+                statusText = phaseNames[phase] || phase;
+            }
+            document.getElementById('progressFill').style.width = pct + '%';
+            document.getElementById('statusText').textContent = statusText;
+            updateWorkspaceHero(currentTaskId || '当前任务', phase, `当前状态：${statusText} 你可以在下方查看参考资产和最终输出。`);
+
+            if (data.error) {
+                document.getElementById('errorText').classList.remove('hidden');
+                document.getElementById('errorText').textContent = data.error;
+            } else {
+                document.getElementById('errorText').classList.add('hidden');
+                document.getElementById('errorText').textContent = '';
+            }
+        }
+
+        function _textureNumber(tid) {
+            const map = { main: 1, secondary: 2, accent_light: 3 };
+            return map[tid] || tid;
+        }
+
+        async function showResults() {
+            document.getElementById('resultsCard').style.display = 'grid';
+            const previewGrid = document.getElementById('previewGrid');
+            previewGrid.innerHTML = '';
+
+            try {
+                const res = await fetch(`/api/v1/tasks/${currentTaskId}/summary`);
+                const summary = await res.json();
+                const variants = summary['裁片模板变体'] || [];
+                for (const v of variants) {
+                    const tid = v['纹理ID'];
+                    const num = _textureNumber(tid);
+
+                    const fpDiv = document.createElement('div');
+                    fpDiv.className = 'preview-item';
+                    fpDiv.innerHTML = `
+                        <img src="/api/v1/tasks/${currentTaskId}/front_pair_check?variant=${tid}&t=${Date.now()}" alt="预览${num} 对位检查" onerror="this.style.display='none'">
+                        <h4>预览 ${num} · 对位检查</h4>
+                    `;
+                    previewGrid.appendChild(fpDiv);
+
+                    const pwDiv = document.createElement('div');
+                    pwDiv.className = 'preview-item';
+                    pwDiv.innerHTML = `
+                        <img src="/api/v1/tasks/${currentTaskId}/preview_white?variant=${tid}&t=${Date.now()}" alt="预览${num} 白底预览" onerror="this.style.display='none'">
+                        <h4>预览 ${num} · 白底预览</h4>
+                    `;
+                    previewGrid.appendChild(pwDiv);
+                }
+
+                if (!variants.length) {
+                    previewGrid.innerHTML = '<div class="empty-state">摘要中还没有可展示的变体结果。</div>';
+                }
+            } catch (e) {
+                console.error(e);
+                previewGrid.innerHTML = '<div class="empty-state">结果摘要加载失败。</div>';
+            }
+
+            const piecesGrid = document.getElementById('piecesGrid');
+            piecesGrid.innerHTML = '';
+            for (let i = 1; i <= 9; i++) {
+                const pid = `piece_${String(i).padStart(3, '0')}_s`;
+                const div = document.createElement('div');
+                div.className = 'piece-thumb';
+                div.innerHTML = `
+                    <img src="/api/v1/tasks/${currentTaskId}/pieces/${pid}?t=${Date.now()}" alt="${pid}" onerror="this.parentElement.style.display='none'">
+                `;
+                piecesGrid.appendChild(div);
+            }
+        }
+
+        let pendingUploadType = null;
+
+        function triggerAssetUpload(type) {
+            if (!currentTaskId) return;
+            pendingUploadType = type;
+            document.getElementById('assetFileInput').click();
+        }
+
+        async function handleAssetUpload(input) {
+            if (!input.files.length || !pendingUploadType || !currentTaskId) return;
+            const file = input.files[0];
+            const type = pendingUploadType;
+            pendingUploadType = null;
+            input.value = '';
+
+            const cap = type.charAt(0).toUpperCase() + type.slice(1);
+            const placeholder = document.getElementById('ref' + cap + 'Placeholder');
+            const statusEl = document.getElementById('ref' + cap + 'Status');
+            placeholder.textContent = '上传中...';
+            statusEl.textContent = '上传中';
+            statusEl.className = 'ref-status ref-status-running';
+
+            const form = new FormData();
+            form.append('file', file);
+
+            let url;
+            if (type === 'hero') {
+                url = `/api/v1/tasks/${currentTaskId}/hero_motif`;
+            } else {
+                url = `/api/v1/tasks/${currentTaskId}/textures/${type}`;
+            }
+
+            try {
+                const res = await fetch(url, { method: 'POST', body: form });
+                const data = await res.json();
+                if (!res.ok) throw new Error(data.detail || '上传失败');
+                const img = document.getElementById('ref' + cap + 'Img');
+                img.onerror = function() {
+                    img.style.display = 'none';
+                    placeholder.style.display = 'flex';
+                    placeholder.textContent = '暂无图片';
+                };
+                img.onload = function() {
+                    img.style.display = 'block';
+                    placeholder.style.display = 'none';
+                };
+                img.src = (type === 'hero' ? `/api/v1/tasks/${currentTaskId}/hero_motif` : `/api/v1/tasks/${currentTaskId}/textures/${type}`) + '?t=' + Date.now();
+                statusEl.textContent = '已完成';
+                statusEl.className = 'ref-status ref-status-completed';
+            } catch (err) {
+                alert('上传失败: ' + err.message);
+                placeholder.textContent = '上传失败';
+                statusEl.textContent = '失败';
+                statusEl.className = 'ref-status ref-status-failed';
+            }
+        }
+
+        function downloadResults() {
+            if (!currentTaskId) return;
+            window.open(`/api/v1/tasks/${currentTaskId}/download`, '_blank');
+        }
+
+        async function deleteTask(taskId) {
+            if (!confirm('确定要删除这个任务吗？\n\n这会清空该任务的所有文件，且无法恢复。')) {
+                return;
+            }
+            try {
+                const res = await fetch(`/api/v1/tasks/${taskId}`, { method: 'DELETE' });
+                const data = await res.json();
+                if (!res.ok) throw new Error(data.detail || '删除失败');
+                if (selectedTaskId === taskId) {
+                    selectedTaskId = null;
+                    currentTaskId = null;
+                    switchMode('new');
+                }
+                loadTasks();
+            } catch (err) {
+                alert('删除失败: ' + err.message);
+            }
+        }
+    </script>
+</body>
+</html>

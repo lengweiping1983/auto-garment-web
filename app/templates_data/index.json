@@ -1,0 +1,27 @@
+{
+  "templates": [
+    {
+      "template_id": "BFSK26308XCJ01L",
+      "template_name": "BFSK26308XCJ01L 防晒服",
+      "template_name_en": "BFSK26308XCJ01L Sun Protection Clothing",
+      "garment_type": "sun protection clothing",
+      "aliases": ["防晒服", "防晒衣", "sun protection clothing"],
+      "description": "BFSK26308XCJ01L 防晒服，9片结构：后片、前左片、前右片、左袖、右袖、领子左、领子右、门襟、下摆",
+      "piece_count": 9,
+      "sizes": ["s"],
+      "default_size": "s"
+    },
+    {
+      "template_id": "DDS26126XCJ01L",
+      "template_name": "DDS26126XCJ01L T恤",
+      "template_name_en": "DDS26126XCJ01L T-Shirt",
+      "garment_type": "t-shirt",
+      "aliases": ["t恤", "T 恤", "T恤", "男士T恤", "男士 T 恤", "t-shirt", "t shirt", "tee", "tee shirt", "衬衫", "男士衬衫", "shirt", "men shirt", "mens shirt", "men's shirt"],
+      "description": "DDS26126XCJ01L 上装/T恤/衬衫通用模板，9片结构：后片、前左片、前右片、左袖、右袖、领子左、领子右、门襟、下摆",
+      "piece_count": 9,
+      "sizes": ["s"],
+      "default_size": "s"
+    }
+  ],
+  "version": "1.0.0"
+}

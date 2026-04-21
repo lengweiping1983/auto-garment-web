@@ -1,0 +1,29 @@
+# Web Framework
+fastapi>=0.115.0
+uvicorn[standard]>=0.34.0
+python-multipart>=0.0.20
+
+# Async HTTP
+httpx>=0.28.0
+
+# Image Processing
+Pillow>=11.1.0
+numpy>=2.2.0
+
+# Data Validation & Config
+pydantic>=2.10.0
+pydantic-settings>=2.7.0
+
+# LLM Client
+openai>=1.60.0
+
+# Utilities
+python-dotenv>=1.0.0
+aiofiles>=24.1.0
+
+# Neo AI OSS Upload
+oss2>=2.18.0
+
+# Testing
+pytest>=8.3.0
+pytest-asyncio>=0.25.0

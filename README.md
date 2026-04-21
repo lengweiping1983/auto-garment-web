@@ -44,10 +44,10 @@ cp .env.example .env
 ### 3. 启动服务
 
 ```bash
-uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+uvicorn app.main:app --host 0.0.0.0 --port 3000 --reload
 ```
 
-访问 http://localhost:8000/ 打开前端页面。
+访问 http://localhost:3000/ 打开前端页面。
 
 ## API 端点
 
@@ -120,4 +120,5 @@ pending → analyzing (视觉分析 + 提示词生成)
 1. 启用 `worker/celery_app.py`
 2. 将 `pipeline.py` 中的 `run_pipeline` 改为 Celery task
 3. 任务状态从文件系统迁移到 Redis
+# auto-garment-web
 # auto-garment-web

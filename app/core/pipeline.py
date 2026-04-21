@@ -20,7 +20,7 @@ from pathlib import Path
 
 from app.config import settings
 from app.core.neo_ai_client import NeoAIClient
-from app.core.prompt_sanitizer import sanitize_prompt_for_strict_image_safety
+from app.core.prompt_sanitizer import prepare_image_generation_payload
 
 from PIL import Image
 from app.core.renderer import render_all, compose_preview
@@ -121,6 +121,10 @@ def _write_json(path: Path, payload: dict) -> Path:
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
     return path
+
+
+def _normalized_generation_payload(prompt: str, negative_prompt: str, strict: bool = False) -> tuple[str, str]:
+    return prepare_image_generation_payload(prompt, negative_prompt, strict=strict)
 
 
 def clear_rerender_outputs(task_id: str) -> None:
@@ -426,10 +430,11 @@ async def _gen_hero(
     })
     _update_detail_field(task_id, "hero_motif", {"status": "running"})
     try:
+        safe_prompt, safe_negative = _normalized_generation_payload(prompt, negative_prompt, strict=False)
         try:
             task_code = await neo.submit_generation(
-                prompt=prompt,
-                negative_prompt=negative_prompt,
+                prompt=safe_prompt,
+                negative_prompt=safe_negative,
                 model=model,
                 size=size,
                 reference_images=[ref_url] if ref_url else None,
@@ -438,9 +443,10 @@ async def _gen_hero(
             if not _is_prompt_safety_error(exc):
                 raise
             print("[RETRY] Hero prompt hit moderation, retrying with stricter sanitization...")
+            safe_prompt, safe_negative = _normalized_generation_payload(prompt, negative_prompt, strict=True)
             task_code = await neo.submit_generation(
-                prompt=sanitize_prompt_for_strict_image_safety(prompt, prompt_role="positive"),
-                negative_prompt=sanitize_prompt_for_strict_image_safety(negative_prompt, prompt_role="negative"),
+                prompt=safe_prompt,
+                negative_prompt=safe_negative,
                 model=model,
                 size=size,
                 reference_images=[ref_url] if ref_url else None,
@@ -471,10 +477,11 @@ async def _gen_texture(
     work = texture_root / tid
     work.mkdir(parents=True, exist_ok=True)
     try:
+        safe_prompt, safe_negative = _normalized_generation_payload(prompt, negative_prompt, strict=False)
         try:
             task_code = await neo.submit_generation(
-                prompt=prompt,
-                negative_prompt=negative_prompt,
+                prompt=safe_prompt,
+                negative_prompt=safe_negative,
                 model=model,
                 size=size,
                 reference_images=[ref_url] if ref_url else None,
@@ -483,9 +490,10 @@ async def _gen_texture(
             if not _is_prompt_safety_error(exc):
                 raise
             print(f"[RETRY] Texture {tid} prompt hit moderation, retrying with stricter sanitization...")
+            safe_prompt, safe_negative = _normalized_generation_payload(prompt, negative_prompt, strict=True)
             task_code = await neo.submit_generation(
-                prompt=sanitize_prompt_for_strict_image_safety(prompt, prompt_role="positive"),
-                negative_prompt=sanitize_prompt_for_strict_image_safety(negative_prompt, prompt_role="negative"),
+                prompt=safe_prompt,
+                negative_prompt=safe_negative,
                 model=model,
                 size=size,
                 reference_images=[ref_url] if ref_url else None,

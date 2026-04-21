@@ -88,6 +88,7 @@ class LLMClient:
                 messages=anthropic_messages,
                 max_tokens=max_tokens,
                 temperature=temperature,
+                extra_body={"chat_template_kwargs": {"thinking": False}},
             )
             return response.content[0].text if response.content else ""
 
@@ -96,7 +97,7 @@ class LLMClient:
             messages=messages,
             temperature=temperature,
             max_tokens=max_tokens,
-            extra_body={"enable_thinking": False},
+            extra_body={"chat_template_kwargs": {"thinking": False}},
         )
         return response.choices[0].message.content or ""
 

@@ -5,42 +5,16 @@ This module only does: formatting, sanitization, and JSON assembly.
 No prompt generation or heavy injection — the LLM already did the work.
 """
 import json
+import re
 from pathlib import Path
 
 try:
-    from app.core.prompt_sanitizer import sanitize_prompt, sanitize_prompt_for_image_generation, sanitize_prompts_in_dict, sanitize_blur_risks
+    from app.core.prompt_sanitizer import prepare_image_generation_payload
 except Exception:
-    def sanitize_prompt(text, domain="generic", prompt_role="positive"):
-        return text
-    def sanitize_prompt_for_image_generation(text, prompt_role="positive"):
-        return text
-    def sanitize_prompts_in_dict(data, keys=("prompt",), domain="generic"):
-        return data
-    def sanitize_blur_risks(text):
-        return text
+    def prepare_image_generation_payload(prompt, negative_prompt="", strict=False):
+        return prompt, negative_prompt
 
-
-TEXTURE_NEGATIVE_EN = (
-    "no animals, no characters, no faces, no people, no text, "
-    "no labels, no captions, no titles, no words, no letters, no typography, no logo, no watermark, "
-    "no house, no river, no full landscape scene, no scenery, no environment, no background scene, no poster composition, no sticker sheet, "
-    "no harsh black outlines, no dense confetti, no neon colors, no muddy dark colors, "
-    "no abstract wash, no plain texture, no paper grain only, no gradient, no empty background, no tonal atmosphere only, no blurred background, "
-    "no folds, no wrinkles, no draping, no creases, no shadows, no 3D fabric photography, no light variation across surface, "
-    "no gradient backgrounds inside individual panels, no photographic realism, no vector flatness, no digital gradient, "
-    "blurry, out of focus, smeared, smudged, vignette, distorted, deformed, low quality, jpeg artifacts, grainy"
-)
-
-HERO_NEGATIVE_EN = (
-    "text, labels, captions, titles, typography, words, letters, signage, logo, watermark, "
-    "colored background, tinted backdrop, gradient background, plain light box, colored background box, filled rectangle, "
-    "background art, scenery, landscape, environment, ground plane, floor, border, frame, extra objects, "
-    "drop shadow, contact shadow, cast shadow, halo effect around subject, "
-    "full illustration scene, poster composition, sticker sheet, garment mockup, fashion model, mannequin, "
-    "person wearing garment, product photo, lookbook, vignette, "
-    "botanical backdrop, foliage behind subject, painted wash behind subject, garden background, meadow background, "
-    "blurry, out of focus, smeared, smudged, distorted, deformed, low quality, jpeg artifacts, grainy"
-)
+from app.core.prompt_blocks import HERO_NEGATIVE_EN, PANEL_DEFAULTS_EN, TEXTURE_NEGATIVE_EN
 
 
 def _ensure_white_background_hero(prompt: str) -> str:
@@ -84,6 +58,103 @@ def _ensure_white_background_hero(prompt: str) -> str:
     )
     return f"{cleaned}, {suffix}"
 
+
+_PANEL_CONTRADICTION_PATTERNS = {
+    "hero_motif_1": (
+        r"\bseamless\b",
+        r"\btileable\b",
+        r"\ball-over print\b",
+        r"\brepeat(?: pattern)?\b",
+        r"\bfabric texture\b",
+        r"\bpattern swatch\b",
+        r"\btextile print\b",
+    ),
+    "texture_1": (
+        r"\bmodel\b",
+        r"\bmannequin\b",
+        r"\bperson\b",
+        r"\bwearing garment\b",
+        r"\bgarment mockup\b",
+        r"\bt-?shirt mockup\b",
+        r"\bplacement graphic\b",
+        r"\bcentered complete subject\b",
+        r"\bfull uncropped figure\b",
+        r"\bpure white background\b",
+    ),
+    "texture_2": (
+        r"\bmodel\b",
+        r"\bmannequin\b",
+        r"\bperson\b",
+        r"\bwearing garment\b",
+        r"\bgarment mockup\b",
+        r"\bt-?shirt mockup\b",
+        r"\bplacement graphic\b",
+        r"\bcentered complete subject\b",
+        r"\bfull uncropped figure\b",
+        r"\bpure white background\b",
+    ),
+    "texture_3": (
+        r"\bmodel\b",
+        r"\bmannequin\b",
+        r"\bperson\b",
+        r"\bwearing garment\b",
+        r"\bgarment mockup\b",
+        r"\bt-?shirt mockup\b",
+        r"\bplacement graphic\b",
+        r"\bcentered complete subject\b",
+        r"\bfull uncropped figure\b",
+        r"\bpure white background\b",
+    ),
+}
+
+_PROMPT_JUNK_CHUNKS = {
+    "on",
+    "in",
+    "at",
+    "with",
+    "feeling",
+    "mockup feeling",
+    "garment mockup feeling",
+}
+
+
+def _clean_prompt_text(text: str) -> str:
+    text = re.sub(r"\s+", " ", text)
+    text = re.sub(r"\s+([,.;:!?])", r"\1", text)
+    text = re.sub(r"(?:,\s*){2,}", ", ", text)
+    text = re.sub(r"([,.;:!?]){2,}", r"\1", text)
+    return text.strip(" ,;")
+
+
+def _dedupe_prompt_chunks(text: str) -> str:
+    chunks = [chunk.strip() for chunk in re.split(r"\s*,\s*", text or "") if chunk.strip()]
+    seen = set()
+    unique = []
+    for chunk in chunks:
+        key = chunk.lower()
+        if key in _PROMPT_JUNK_CHUNKS:
+            continue
+        if len(key.split()) == 1 and key in {"on", "in", "at", "with", "for", "by"}:
+            continue
+        if key in seen:
+            continue
+        seen.add(key)
+        unique.append(chunk)
+    return ", ".join(unique)
+
+
+def _merge_panel_prompt(raw: str, panel_id: str) -> str:
+    text = raw or ""
+
+    for pattern in _PANEL_CONTRADICTION_PATTERNS.get(panel_id, ()):
+        text = re.sub(pattern, "", text, flags=re.IGNORECASE)
+
+    base_contract = PANEL_DEFAULTS_EN.get(panel_id, "")
+    if base_contract:
+        text = f"{text}, {base_contract}" if text else base_contract
+
+    return _dedupe_prompt_chunks(_clean_prompt_text(text))
+
 def generate_texture_prompts(visual: dict, out_dir: Path) -> tuple[dict[str, str], dict]:
     """Build texture prompts from LLM-generated visual elements."""
     generated_prompts = visual.get("generated_prompts", {})
@@ -111,19 +182,16 @@ def generate_texture_prompts(visual: dict, out_dir: Path) -> tuple[dict[str, str
         # 2. Program fallback: ensure hero has pure white background
         if tid == "hero_motif_1":
             raw = _ensure_white_background_hero(raw)
-
-        # 3. Sanitize: stop-words, banned words, blur risks
-        cleaned = sanitize_prompt(raw, domain="fashion")
-        cleaned = sanitize_blur_risks(cleaned)
-        cleaned = sanitize_prompt_for_image_generation(cleaned, prompt_role="positive")
+        raw = _merge_panel_prompt(raw, tid)
 
         purpose, panel, role, negative = meta[tid]
+        cleaned, cleaned_negative = prepare_image_generation_payload(raw, negative, strict=False)
 
         item = {
             "texture_id": tid,
             "purpose": purpose,
             "prompt": cleaned,
-            "negative_prompt": negative,
+            "negative_prompt": cleaned_negative,
             "panel": panel,
             "role": role,
         }
@@ -136,16 +204,13 @@ def generate_texture_prompts(visual: dict, out_dir: Path) -> tuple[dict[str, str
         "generation_owner": "neo_ai",
         "prompts": prompts,
     }
-
-    # Final safety pass over all prompts + negative_prompts
-    texture_prompts = sanitize_prompts_in_dict(
-        texture_prompts, keys=("prompt", "negative_prompt"), domain="fashion"
-    )
-
     for item in texture_prompts.get("prompts", []):
-        item["prompt"] = sanitize_prompt_for_image_generation(item.get("prompt", ""), prompt_role="positive")
+        item["prompt"], item["negative_prompt"] = prepare_image_generation_payload(
+            item.get("prompt", ""),
+            item.get("negative_prompt", ""),
+            strict=False,
+        )
 
-    # Rebuild prompt_map after final sanitization
     prompt_map = {p["texture_id"]: p["prompt"] for p in texture_prompts["prompts"]}
     return prompt_map, texture_prompts
 

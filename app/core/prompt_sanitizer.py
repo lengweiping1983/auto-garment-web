@@ -268,6 +268,13 @@ ANTI_BLUR_NEGATIVE_ADDONS = (
     "distorted, deformed, low quality, jpeg artifacts, grainy"
 )
 
+NEGATIVE_PROMPT_KEEP_HINTS = (
+    "quality", "artifact", "blurr", "out of focus", "smear", "smudge",
+    "grain", "distort", "deform", "watermark", "logo", "text", "letter",
+    "typography", "caption", "title", "shadow", "wrinkle", "fold", "crease",
+    "gradient", "scene", "landscape", "background",
+)
+
 
 def _is_in_negation_span(lower_text: str, target_word: str, word_index: int) -> bool:
     """检查目标词是否处于 no/without 引导的否定范围内。
@@ -358,6 +365,10 @@ def sanitize_blur_risks(text: str) -> str:
         # 使用大小写不敏感的正则替换，保留原大小写风格
         def _repl(m: re.Match) -> str:
             orig = m.group(0)
+            context_start = max(0, m.start() - 48)
+            context = out[context_start:m.start()].lower()
+            if re.search(r"\b(no|without)\b[^.;,:!?]{0,48}$", context):
+                return orig
             if not replacement:
                 return ""
             return _token_case_like(orig, replacement)
@@ -414,6 +425,7 @@ def _clean_joined_text(text: str) -> str:
     text = re.sub(r"([,.;:!?]){2,}", r"\1", text)
     text = re.sub(r"\b(no|without)\s*,", r"\1", text, flags=re.IGNORECASE)
     text = re.sub(r"(?:\b(?:no|without)\b\s*){2,}", "no ", text, flags=re.IGNORECASE)
+    text = re.sub(r"\b([A-Za-z-]+)(\s+\1\b)+", r"\1", text, flags=re.IGNORECASE)
     text = re.sub(r"(?:,\s*){2,}", ", ", text)
     return text.strip(" ,;")
 
@@ -456,27 +468,54 @@ def _dedupe_comma_chunks(text: str) -> str:
     return ", ".join(unique)
 
 
-def sanitize_prompt_for_strict_image_safety(text: str, prompt_role: str = "positive") -> str:
-    """Stricter final pass used when image vendors reject prompts for sensitive wording."""
+def _filter_negative_chunks_for_image_generation(text: str, strict: bool = False) -> str:
+    if not text:
+        return text
+    chunks = [chunk.strip() for chunk in re.split(r"\s*,\s*", text) if chunk.strip()]
+    if not strict:
+        return _dedupe_comma_chunks(", ".join(chunks))
+
+    keep_chunks = []
+    for chunk in chunks:
+        lowered = chunk.lower()
+        if any(term in lowered for term in NEGATIVE_PROMPT_KEEP_HINTS):
+            keep_chunks.append(chunk)
+    return _dedupe_comma_chunks(", ".join(keep_chunks))
+
+
+def normalize_image_generation_prompt(text: str, prompt_role: str = "positive", strict: bool = False) -> str:
+    """Single entrypoint for prompts that will actually be sent to image vendors."""
     if not text or not isinstance(text, str):
         return text
 
-    out = sanitize_prompt_for_image_generation(text, prompt_role=prompt_role)
-    out = _strip_config_high_risk_terms(out, prompt_role=prompt_role)
+    out = sanitize_prompt(text, domain="fashion", prompt_role=prompt_role)
+    if prompt_role != "negative":
+        out = sanitize_blur_risks(out)
+
+    phrase_rewrites = _config_phrase_rewrites() or IMAGE_SAFE_PHRASE_REPLACEMENTS
+    for pattern, replacement in phrase_rewrites:
+        out = re.sub(pattern, replacement, out, flags=re.IGNORECASE)
+
+    if strict:
+        out = _strip_config_high_risk_terms(out, prompt_role=prompt_role)
 
     if prompt_role == "negative":
-        # Keep negative prompts focused on render quality and structural constraints,
-        # not on enumerating safety categories that moderation often flags.
-        keep_chunks = []
-        for chunk in re.split(r"\s*,\s*", out):
-            lowered = chunk.lower().strip()
-            if not lowered:
-                continue
-            if any(term in lowered for term in ("quality", "artifact", "blurr", "smear", "smudge", "grain", "distort", "deform", "watermark", "logo", "text", "letter", "typography", "caption", "title", "shadow", "wrinkle", "fold", "crease", "gradient", "scene", "landscape", "background")):
-                keep_chunks.append(chunk.strip())
-        out = ", ".join(dict.fromkeys(keep_chunks))
+        out = _filter_negative_chunks_for_image_generation(out, strict=strict)
 
-    return _clean_joined_text(_dedupe_comma_chunks(out))
+    return _dedupe_comma_chunks(_clean_joined_text(_dedupe_comma_chunks(out)))
+
+
+def prepare_image_generation_payload(prompt: str, negative_prompt: str = "", strict: bool = False) -> tuple[str, str]:
+    """Return normalized positive/negative prompts for one image generation request."""
+    return (
+        normalize_image_generation_prompt(prompt, prompt_role="positive", strict=strict),
+        normalize_image_generation_prompt(negative_prompt, prompt_role="negative", strict=strict),
+    )
+
+
+def sanitize_prompt_for_strict_image_safety(text: str, prompt_role: str = "positive") -> str:
+    """Stricter final pass used when image vendors reject prompts for sensitive wording."""
+    return normalize_image_generation_prompt(text, prompt_role=prompt_role, strict=True)
 
 
 def sanitize_prompt_with_report(text: str, domain: str = "generic", prompt_role: str = "positive") -> PromptSanitizationResult:
@@ -588,13 +627,7 @@ def sanitize_prompt(text: str, domain: str = "generic", prompt_role: str = "posi
 
 def sanitize_prompt_for_image_generation(text: str, prompt_role: str = "positive") -> str:
     """Apply conservative rewrites before submitting prompts to image models."""
-    if not text or not isinstance(text, str):
-        return text
-    out = sanitize_prompt(text, domain="fashion", prompt_role=prompt_role)
-    phrase_rewrites = _config_phrase_rewrites() or IMAGE_SAFE_PHRASE_REPLACEMENTS
-    for pattern, replacement in phrase_rewrites:
-        out = re.sub(pattern, replacement, out, flags=re.IGNORECASE)
-    return _clean_joined_text(out)
+    return normalize_image_generation_prompt(text, prompt_role=prompt_role, strict=False)
 
 
 def sanitize_prompts_in_dict(data: dict, keys: tuple[str, ...] = ("prompt",), domain: str = "generic") -> dict:
@@ -610,7 +643,10 @@ def sanitize_prompts_in_dict(data: dict, keys: tuple[str, ...] = ("prompt",), do
         for k, v in data.items():
             if k in keys and isinstance(v, str):
                 role = "negative" if k == "negative_prompt" else "positive"
-                out[k] = sanitize_prompt(v, domain=domain, prompt_role=role)
+                if domain == "fashion":
+                    out[k] = normalize_image_generation_prompt(v, prompt_role=role, strict=False)
+                else:
+                    out[k] = sanitize_prompt(v, domain=domain, prompt_role=role)
             else:
                 out[k] = sanitize_prompts_in_dict(v, keys=keys, domain=domain)
         return out

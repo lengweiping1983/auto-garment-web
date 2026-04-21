@@ -84,6 +84,8 @@ VISION_SYSTEM_PROMPT = """
 ## 输出格式（强制）
 
 必须严格按以下模板输出。无信息字段填 `"无"`，不可省略任何字段。
+最终回复必须是**单个合法 JSON 对象**，不要输出 Markdown 说明、不要输出代码围栏、不要输出额外前后缀文字。
+`generated_prompts` 中四个字段都必须是**可直接提交给图像模型的最终英文 prompt 字符串**，不是中文解释，不要写 "prompt:"、"here is"、"约100词"、"用于生成" 这类元话术。
 
 ```json
 {
@@ -102,7 +104,7 @@ VISION_SYSTEM_PROMPT = """
             "accent": "点缀色+近似HEX"
             },
             "texture_material": "材质与纹理",
-            "surface_property": "表面光学特性（漫反射/镜面/透明/发光）",
+            "surface_property": "表面光学特性（漫反射/镜面/半透明主体/柔和发光；若主体可透视，仅描述主体自身，不得推导为透明背景）",
             "fine_details": ["关键细节1", "关键细节2"]
         }
         },
@@ -189,10 +191,10 @@ VISION_SYSTEM_PROMPT = """
     }
   },
   "generated_prompts": {
-    "hero_motif_1": "英文白底服装定位印花图案生成提示词，约100-300词。基于上方 struct 结构化数据中 subject.primary（主主体）和 subject.secondary（次要主体）的完整描述，提炼并扩展成一个可直接提交给 AI 图像模型的最终英文 prompt，无需任何后处理。此图案用于商业成衣（T恤、衬衫、防晒服等上装）的定位印花（placement print），印在前胸、后背或侧缝等服装部位，不是装饰画、海报或贴纸。必须逐条包含：1) 主体精确类别与数量；2) 整体轮廓与体量感；3) 主色/辅色/点缀色（附近似 HEX 值）；4) 材质纹理与表面光学特性（哑光/镜面/透明/发光）；5) 姿态、动作、朝向；6) 所有关键细节（花纹、配饰、表情、肌理、边缘特征）；7) 纯白硬底拍摄式背景与清晰边缘要求。强制关键词（必须原样包含）：isolated foreground subject only, pure white background, no shadow, no floor, no scenery, no extra objects, no text, no logo, no watermark, centered complete subject, full uncropped figure, clean crisp edges, apparel placement graphic, commercial garment print。严禁：服装版型、褶皱、人体穿着效果、模特、光影场景、背景画面、画框/贴纸排版、渐变色背景、彩色背景盒、3D 渲染效果。",
-    "texture_1": "英文无缝平铺服装面料印花生成提示词，约80-120词。基于对原图最主要、最大面积底纹/图案的精确观察，生成一个可直接提交给 AI 图像模型的最终英文 prompt，无需任何后处理。此纹理用于商业成衣（T恤、衬衫、防晒服等上装）的大身面料印花，覆盖前身、后身等主要裁片，不是壁纸、包装纸或装饰画。必须与图片底纹 100% 吻合（图案类型、主题元素、排列方式、疏密程度、色彩比例、线条粗细）。必须是全屏无缝平铺纹理（seamless tileable all-over fabric print），无边界感，无中心焦点，无透视变形，flat 2D 纯图案，无阴影，无褶皱，无服装形态。强制包含：seamless pattern, tileable, all-over print, flat 2D, no shading, no folds, fabric texture, commercial apparel textile。此纹理与 texture_2、texture_3 共享同一色板（主色/辅色/点缀色一致）和艺术风格（画笔质感、线条语言、饱和度范围）。",
-    "texture_2": "英文协调无缝平铺服装面料印花生成提示词，约60-100词。基于对原图次要图案或辅助纹理的精确观察，生成一个可直接提交给 AI 图像模型的最终英文 prompt，无需任何后处理。此纹理用于商业成衣（T恤、衬衫、防晒服等上装）的拼接部位面料印花，如袖子、侧缝、领贴、内衬等裁片，不是壁纸或装饰画。与 texture_1 共享完全相同的色彩体系（主色/辅色/点缀色）和艺术风格（画笔质感、线条粗细、饱和度范围），但在图案密度或元素尺度上形成层次差异（可更稀疏、更抽象、更几何化或更细碎）。同样必须是无缝平铺（seamless tileable），flat 2D 纯图案，无阴影，无服装形态。强制包含：seamless pattern, tileable, coordinated palette, flat 2D, no shading, fabric texture。",
-    "texture_3": "英文微观装饰服装面料印花生成提示词，约40-80词。基于对原图最小尺度装饰性纹理的精确观察，生成一个可直接提交给 AI 图像模型的最终英文 prompt，无需任何后处理。此纹理用于商业成衣（T恤、衬衫、防晒服等上装）的小面积点缀面料印花，如领口罗纹、袖口边、下摆边、口袋贴布等细节裁片，不是壁纸或装饰画。与 texture_1/texture_2 保持同一色板和同一艺术风格，但尺度最小（重复单元约 2-5cm），密度受控，仅作为点缀使用。必须是无缝平铺纯图案（seamless tileable flat 2D），无任何服装结构暗示。强制包含：micro pattern, small-scale repeat, seamless, tileable, flat 2D, accent detail, fabric texture, no shading。"
+    "hero_motif_1": "一个最终英文正向 prompt，长度约100-220词，直接可用于图像生成。基于 struct 中主主体与次主体信息，只描述最终要生成的定位印花主体，不要解释过程，不要写中文，不要写提示语说明。用途是商业上装的白底定位印花（placement print），不是海报、贴纸、包装图或整件服装效果图。必须写入：主体精确类别与数量、整体轮廓与体量、主色/辅色/点缀色及近似 HEX、主体自身材质与表面光学特性、姿态动作朝向、关键纹样与边缘特征。若主体本身可透光或半透明，只能描述主体自身质感，绝不能把背景写成透明。必须原样包含这些短语：isolated foreground subject only, pure white background, no shadow, no floor, no scenery, no extra objects, no text, no logo, no watermark, centered complete subject, full uncropped figure, clean crisp edges, apparel placement graphic, commercial garment print。禁止出现：transparent background, alpha background, PNG cutout, background removal, checkerboard preview, fake transparency grid, sticker cutout, isolated on transparent, seamless, tileable, repeat pattern, all-over print, fabric swatch, wallpaper, packaging paper, garment mockup, fashion model, mannequin, person wearing garment, 3D render。",
+    "texture_1": "一个最终英文正向 prompt，长度约70-120词，直接可用于图像生成。它表示面积最大的主底纹，必须只描述纯图案本身，不要解释过程，不要写中文，不要写任何元说明。用途是商业上装大身面料印花，不是海报、贴纸、场景图、白底单主体图。必须与原图底纹在主题元素、排列方式、密度、色彩比例、线条粗细上高度一致。必须写成无缝平铺的 2D 面料印花，并与 texture_2、texture_3 共享同一色板与同一艺术风格。必须原样包含这些短语：seamless pattern, tileable, all-over print, flat 2D, no shading, no folds, fabric texture, commercial apparel textile。禁止出现：pure white background, isolated foreground subject only, centered complete subject, full uncropped figure, placement graphic, transparent background, alpha background, garment mockup, fashion model, mannequin, person wearing garment, scenery, poster, sticker, product photo。",
+    "texture_2": "一个最终英文正向 prompt，长度约60-100词，直接可用于图像生成。它表示与 texture_1 协调的次级图案或辅助纹理，必须只描述纯图案本身，不要解释过程，不要写中文，不要写任何元说明。它与 texture_1 使用完全相同的色彩体系和艺术表现语言，但在元素尺度、疏密、抽象程度上形成层次差异。必须是无缝平铺的 2D 面料图案，不能写成人物、服装效果、白底单主体。必须原样包含这些短语：seamless pattern, tileable, coordinated palette, flat 2D, no shading, fabric texture。禁止出现：pure white background, isolated foreground subject only, centered complete subject, full uncropped figure, placement graphic, transparent background, alpha background, garment mockup, fashion model, mannequin, person wearing garment, scenery, poster, sticker, product photo。",
+    "texture_3": "一个最终英文正向 prompt，长度约40-80词，直接可用于图像生成。它表示最小尺度的微装饰纹理，只描述纯图案本身，不要解释过程，不要写中文，不要写任何元说明。它必须与 texture_1、texture_2 保持同一色板和同一艺术风格，但重复单元最小、密度受控、只作为点缀。必须是无缝平铺的 2D 面料图案，不能出现白底主体、模特、穿着效果或场景。必须原样包含这些短语：micro pattern, small-scale repeat, seamless, tileable, flat 2D, accent detail, fabric texture, no shading。禁止出现：pure white background, isolated foreground subject only, centered complete subject, full uncropped figure, placement graphic, transparent background, alpha background, garment mockup, fashion model, mannequin, person wearing garment, scenery, poster, sticker, product photo。"
   }
 }
 ```
@@ -226,6 +228,18 @@ VISION_SYSTEM_PROMPT = """
    - 三个纹理之间必须保持**色彩共享**（使用相同的色板）和**风格统一**（相同的艺术表现手法），仅在图案密度、元素尺度、复杂度上拉开层次。
    - texture_1 对应图片中**面积最大**的底纹；texture_2 对应**次要**图案或抽象变体；texture_3 对应**最小尺度**的装饰性微图案。
 
+7. **主图白底要求不得歧义（关键）**
+   - hero_motif_1 必须输出为**纯白实体背景**的定位印花主体，不是透明底、不是可抠图预览、不是贴纸 cutout。
+   - 如果主体本身具有玻璃、水晶、薄纱、果冻、冰块等透光或半透明特征，只能描述**主体自身**的透光质感，绝不允许把背景写成 transparent / alpha / cutout / background removal / checkerboard。
+   - ✅ 正确示例: "glass bird motif with translucent wings, isolated foreground subject only, pure white background, clean crisp edges"
+   - ❌ 错误示例: "transparent background png cutout of a glass bird"
+
+8. **禁止输出自相矛盾的 prompt（关键）**
+   - hero_motif_1 绝不能同时出现白底单主体要求与平铺纹理要求。例如不能同时写 `pure white background` 和 `seamless pattern`。
+   - texture_1/2/3 绝不能同时出现平铺纹理要求与白底单主体要求。例如不能同时写 `tileable` 和 `centered complete subject`。
+   - 若原图信息与商业成衣生成目标冲突，优先服从商业成衣目标：主图输出白底定位主体，纹理输出可平铺纯图案。
+   - 输出前先检查一遍：每个 prompt 内不允许同时出现互相冲突的背景、构图、用途词。
+
 ---
 
 ## 自检（输出前默念）
@@ -237,6 +251,8 @@ VISION_SYSTEM_PROMPT = """
 - **色彩**有近似HEX值吗？
 - 图中**所有文字**都转录了吗？
 - 我补充了**最容易被忽略的3个关键细节**吗？
+- hero_motif_1 是否仍然保持纯白实体背景，没有任何 transparent / cutout / tileable / repeat 冲突词？
+- texture_1/2/3 是否仍然保持纯图案平铺，没有任何 white background / centered subject / mannequin / wearing garment 冲突词？
 
 """
 

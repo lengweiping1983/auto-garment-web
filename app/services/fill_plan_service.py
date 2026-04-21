@@ -269,22 +269,13 @@ def force_theme_front_split_overlays(
 def build_rule_plan(pieces_payload: dict, texture_set: dict, garment_map: dict) -> dict:
     """Backend rule engine for fill plan."""
     texture_ids = approved_ids(texture_set, "textures", "texture_id")
-    motif_ids = approved_ids(texture_set, "motifs", "motif_id")
-    solid_ids = approved_ids(texture_set, "solids", "solid_id")
     if not texture_ids:
         raise RuntimeError("没有可用面料可用于填充计划。")
 
-    main_id = choose(texture_ids, ["main", "base", "secondary", "accent_light", "dark_base"])
-    secondary_id = choose(texture_ids, ["secondary", "main", "accent_light", "accent_mid", "dark_base"])
-    accent_id = choose(texture_ids, ["accent_light", "accent_mid", "accent", "secondary", "main", "dark_base"])
-    dark_id = choose(texture_ids, ["dark_base", "dark", "secondary", "accent_light", "main"])
-    trim_solid_id = choose(solid_ids, ["quiet_solid", "quiet_moss", "moss_green", "forest_green", "dark", "solid"])
-    motif_id = choose(motif_ids, ["hero_motif", "hero", "accent_motif"])
+    t1_id = choose(texture_ids, ["texture_1", "texture_2", "texture_3", "base", "dark_base"])
 
     by_piece = {item["piece_id"]: item for item in garment_map.get("pieces", [])}
     sorted_pieces = sorted(pieces_payload.get("pieces", []), key=lambda p: p.get("area", 0), reverse=True)
-    largest_area = sorted_pieces[0]["area"] if sorted_pieces else 1
-    hero_count = 0
     entries = []
     group_params: dict[str, dict] = {}
 
@@ -294,13 +285,6 @@ def build_rule_plan(pieces_payload: dict, texture_set: dict, garment_map: dict) 
         zone = map_item.get("zone", "detail")
         symmetry_group = map_item.get("symmetry_group", "")
         same_shape_group = map_item.get("same_shape_group", "")
-        direction = int(map_item.get("direction_degrees", 0) or 0)
-        texture_direction = map_item.get("texture_direction", "")
-        aspect = piece.get("width", 1) / max(1, piece.get("height", 1))
-        area_ratio = piece.get("area", 0) / max(1, largest_area)
-        is_true_trim = zone == "trim" or role in ("trim_strip", "collar_or_upper_trim", "hem_or_lower_trim")
-        is_trim = is_true_trim and area_ratio < 0.18
-        is_hero = role == "front_hero" and hero_count < (1 if len(sorted_pieces) < 8 else 2)
         group_key = same_shape_group or symmetry_group
         if group_key and group_key in group_params:
             params = group_params[group_key]
@@ -312,58 +296,20 @@ def build_rule_plan(pieces_payload: dict, texture_set: dict, garment_map: dict) 
             }
             if group_key:
                 group_params[group_key] = params
+        piece_scale = params.get("scale") or 1.18
+        if group_key and params.get("scale") is None:
+            params["scale"] = piece_scale
         entry = {
             "piece_id": piece["piece_id"],
             "garment_role": role,
             "zone": zone,
             "symmetry_group": symmetry_group,
             "same_shape_group": same_shape_group,
-            "direction_degrees": direction,
-            "texture_direction": texture_direction,
-            "base": None,
+            "base": make_layer("texture", "统一纹理填充", texture_id=t1_id, scale=piece_scale, rotation=0, offset_x=params["offset_x"], offset_y=params["offset_y"]),
             "overlay": None,
             "trim": None,
-            "reason": "",
+            "reason": "所有裁片使用同一纹理，不做角色区分",
         }
-        if is_trim:
-            piece_scale = params.get("scale") or 1.18
-            if group_key and params.get("scale") is None:
-                params["scale"] = piece_scale
-            if dark_id:
-                entry["base"] = make_layer("texture", "饰边优先使用深色协调纹理", texture_id=dark_id, scale=piece_scale, rotation=0, offset_x=params["offset_x"], offset_y=params["offset_y"])
-            elif accent_id:
-                entry["base"] = make_layer("texture", "无 dark 纹理时饰边可使用 subtle accent texture", texture_id=accent_id, scale=piece_scale, rotation=0, offset_x=params["offset_x"], offset_y=params["offset_y"])
-            elif trim_solid_id:
-                entry["base"] = make_layer("solid", "仅小型饰边在无纹理可用时使用调色板纯色", solid_id=trim_solid_id)
-            entry["reason"] = "饰边使用协调纹理或 subtle accent，保持视觉边界感"
-        elif is_hero:
-            hero_count += 1
-            piece_scale = params.get("scale") or 1.12
-            if group_key and params.get("scale") is None:
-                params["scale"] = piece_scale
-            entry["base"] = make_layer("texture", "前片卖点区使用低噪商业底纹，对齐服装方向", texture_id=main_id, scale=piece_scale, rotation=0, offset_x=params["offset_x"], offset_y=params["offset_y"])
-            if motif_id:
-                entry["overlay"] = make_layer("motif", f"单一卖点图案置于关键可见裁片", motif_id=motif_id, anchor="center", scale=0.72, rotation=0, opacity=1.0, offset_y=-round(piece.get("height", 0) * 0.04))
-            entry["reason"] = "前片卖点区承载简化主题，不切割叙事插画"
-        elif zone == "body" or role in ("back_body", "secondary_body"):
-            piece_scale = params.get("scale") or 1.18
-            if group_key and params.get("scale") is None:
-                params["scale"] = piece_scale
-            entry["base"] = make_layer("texture", "大身裁片使用可穿安静底纹/辅面料，对齐服装方向", texture_id=main_id, scale=piece_scale, rotation=0, offset_x=params["offset_x"], offset_y=params["offset_y"])
-            entry["reason"] = "大身裁片保持低对比度，确保产品可穿"
-        elif zone == "secondary" or role in ("sleeve_pair", "sleeve_or_side_panel"):
-            mirror_x = bool(symmetry_group and piece.get("source_x", 0) > (pieces_payload.get("canvas", {}).get("width", 0) / 2))
-            piece_scale = params.get("scale") or 1.22
-            if group_key and params.get("scale") is None:
-                params["scale"] = piece_scale
-            entry["base"] = make_layer("texture", "匹配或副面板使用协调纹理，共享组参数", texture_id=secondary_id, scale=piece_scale, rotation=0, offset_x=params["offset_x"], offset_y=params["offset_y"], mirror_x=mirror_x)
-            entry["reason"] = "副面板增加节奏感，同形裁片保持视觉一致"
-        else:
-            piece_scale = params.get("scale") or 1.35
-            if group_key and params.get("scale") is None:
-                params["scale"] = piece_scale
-            entry["base"] = make_layer("texture", "小型细节使用受控点缀纹理，不使用复杂叙事艺术", texture_id=accent_id, scale=piece_scale, rotation=0, offset_x=params["offset_x"], offset_y=params["offset_y"])
-            entry["reason"] = "小细节支撑色板，避免杂乱"
         entries.append(entry)
 
     return {
@@ -568,7 +514,7 @@ def enforce_validation(entries: list[dict], pieces_payload: dict, texture_set: d
     by_piece = {p["piece_id"]: p for p in pieces_payload.get("pieces", [])}
     texture_ids = approved_ids(texture_set, "textures", "texture_id")
     solid_ids = approved_ids(texture_set, "solids", "solid_id")
-    main_id = choose(texture_ids, ["main", "base", "secondary", "accent_light", "dark_base"])
+    t1_id = choose(texture_ids, ["texture_1", "texture_2", "texture_3", "base", "dark_base"])
     garment_map = garment_map or {}
     restore_pair_metadata(entries, garment_map, issues)
 
@@ -632,7 +578,7 @@ def enforce_validation(entries: list[dict], pieces_payload: dict, texture_set: d
         if base.get("fill_type") == "texture" and base.get("texture_id") not in texture_ids_set:
             old_id = base.get("texture_id")
             base["texture_id"] = main_id
-            issues.append({"type": "fixed_invalid_texture", "severity": "high", "piece_id": entry["piece_id"], "old_texture_id": old_id, "new_texture_id": main_id, "message": f"texture_id {old_id} 不存在，已替换为 main"})
+            issues.append({"type": "fixed_invalid_texture", "severity": "high", "piece_id": entry["piece_id"], "old_texture_id": old_id, "new_texture_id": main_id, "message": f"texture_id {old_id} 不存在，已替换为 texture_1"})
 
     enforce_pair_texture_constraints(entries, garment_map, pieces_payload, texture_set, issues)
     return entries, issues

@@ -16,6 +16,7 @@ class TaskStatus(str, Enum):
     ANALYZING = "analyzing"
     GENERATING = "generating"
     RENDERING = "rendering"
+    WAITING_ASSETS = "waiting_assets"
     COMPLETED = "completed"
     FAILED = "failed"
 
@@ -37,30 +38,31 @@ class Palette(BaseModel):
 class VisualElements(BaseModel):
     palette: Palette = Field(default_factory=Palette)
     style: StyleInfo = Field(default_factory=StyleInfo)
-    dominant_subject: str = ""
     motif_vocabulary: list[str] = []
     fusion_rule: str = ""
 
 
 class PromptSet(BaseModel):
-    main: str = ""
-    secondary: str = ""
-    accent_light: str = ""
+    texture_1: str = ""
+    texture_2: str = ""
+    texture_3: str = ""
     hero: str = ""
 
 
 class GenerationDetail(BaseModel):
-    hero_motif: str = "pending"
-    main: str = "pending"
-    secondary: str = "pending"
-    accent_light: str = "pending"
+    model_config = {"extra": "allow"}
+    hero_motif: str | dict = "pending"
+    texture_1: str | dict = "pending"
+    texture_2: str | dict = "pending"
+    texture_3: str | dict = "pending"
 
 
 class TaskProgress(BaseModel):
+    model_config = {"extra": "allow"}
     phase: str = ""
     completed_steps: list[str] = []
     current_step: str = ""
-    detail: GenerationDetail = Field(default_factory=GenerationDetail)
+    detail: GenerationDetail | dict = Field(default_factory=GenerationDetail)
 
 
 class TaskCreateResponse(BaseModel):
@@ -73,7 +75,7 @@ class TaskCreateResponse(BaseModel):
 class TaskStatusResponse(BaseModel):
     task_id: str
     status: TaskStatus
-    progress: TaskProgress | None = None
+    progress: TaskProgress | dict | None = None
     error: str | None = None
     created_at: datetime | None = None
     updated_at: datetime | None = None

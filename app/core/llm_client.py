@@ -1,25 +1,8 @@
 """Vision LLM client wrapper."""
 import base64
-import json
 from pathlib import Path
 
 from app.config import settings
-from app.models.schemas import VisualElements
-
-
-VISION_SYSTEM_PROMPT = """你是一位服装印花设计助理。观察用户上传的图片，提取以下信息并返回纯 JSON，不要任何解释文字。
-
-必须返回的字段：
-- palette: {primary: ["#hex", ...], secondary: [...], accent: [...], dark: [...]}
-- style: {medium: "水彩/油画/数字等", mood: "氛围词", brush_quality: "笔触描述", pattern_density: "low|medium|high"}
-- dominant_subject: "图片中最突出的主体描述（用于生成透明主图），必须包含身份、姿态、颜色、风格"
-- motif_vocabulary: ["从图中提炼的 3-8 个小型可重复元素名称，如 tiny flowers, small leaves, dots"]
-- fusion_rule: "一句话描述主图和纹理如何像同一套设计"
-
-约束：
-- 颜色必须从图片真实提取，不要编造
-- 提示词用英文
-- 不要输出 markdown 代码块"""
 
 
 class LLMClient:
@@ -113,50 +96,7 @@ class LLMClient:
             messages=messages,
             temperature=temperature,
             max_tokens=max_tokens,
+            extra_body={"enable_thinking": False},
         )
         return response.choices[0].message.content or ""
 
-    async def analyze_image(self, image_path: Path) -> VisualElements:
-        """Single-call vision analysis returning structured visual elements."""
-        b64_image = self._encode_image(image_path)
-        mime_type = "image/png" if image_path.suffix.lower() == ".png" else "image/jpeg"
-
-        messages = [
-            {
-                "role": "system",
-                "content": VISION_SYSTEM_PROMPT,
-            },
-            {
-                "role": "user",
-                "content": [
-                    {
-                        "type": "text",
-                        "text": "分析这张主题图，提取配色、风格、主体和小元素词汇。",
-                    },
-                    {
-                        "type": "image_url",
-                        "image_url": {
-                            "url": f"data:{mime_type};base64,{b64_image}",
-                        },
-                    },
-                ],
-            },
-        ]
-
-        content = await self.chat_completion(
-            messages=messages,
-            temperature=0.3,
-            max_tokens=2048,
-        )
-
-        # Clean markdown code blocks if any
-        content = content.strip()
-        if content.startswith("```"):
-            content = content.split("\n", 1)[1]
-        if content.endswith("```"):
-            content = content.rsplit("\n", 1)[0]
-        if content.startswith("json"):
-            content = content.split("\n", 1)[1]
-
-        data = json.loads(content.strip())
-        return VisualElements(**data)

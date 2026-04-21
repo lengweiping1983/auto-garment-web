@@ -53,6 +53,18 @@ async def create_task(
 
     garment_type = _validate_garment_type(garment_type)
 
+    # Save task config for later resume/render
+    config_path = work_dir / "task_config.json"
+    config_path.write_text(
+        json.dumps({
+            "garment_type": garment_type,
+            "user_prompt": user_prompt,
+            "neo_model": neo_model,
+            "neo_size": neo_size,
+        }, ensure_ascii=False, indent=2),
+        encoding="utf-8",
+    )
+
     # Start pipeline in background
     background_tasks.add_task(
         run_pipeline,
@@ -200,3 +212,85 @@ async def delete_task(task_id: str):
         return {"ok": True, "message": "任务已删除"}
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"删除失败: {e}")
+
+
+@router.post("/tasks/{task_id}/continue_render")
+async def continue_render(task_id: str, background_tasks: BackgroundTasks):
+    """Skip AI generation and continue with rendering when all assets are manually uploaded."""
+    work_dir = settings.storage_base_dir / task_id
+    if not work_dir.exists():
+        raise HTTPException(status_code=404, detail="任务不存在")
+
+    # Check required assets
+    hero_dir = work_dir / "neo_hero_motif"
+    hero_path = None
+    if hero_dir.exists():
+        for f in sorted(hero_dir.iterdir(), key=lambda p: p.stat().st_mtime, reverse=True):
+            if f.is_file() and f.suffix.lower() in {".png", ".jpg", ".jpeg", ".webp"}:
+                hero_path = f
+                break
+
+    texture_root = work_dir / "neo_textures"
+    texture_paths = {}
+    if texture_root.exists():
+        for tid in ["texture_1", "texture_2", "texture_3"]:
+            p = texture_root / f"{tid}.png"
+            if p.exists():
+                texture_paths[tid] = p
+
+    missing = []
+    if not hero_path:
+        missing.append("主图")
+    for tid in ["texture_1", "texture_2", "texture_3"]:
+        if tid not in texture_paths:
+            missing.append(f"纹理 {[ 'texture_1', 'texture_2', 'texture_3'].index(tid) + 1}")
+
+    if missing:
+        raise HTTPException(status_code=400, detail=f"缺少必要资产，请手动上传: {', '.join(missing)}")
+
+    # Find theme image
+    theme_inputs_dir = work_dir / "theme_inputs"
+    theme_path = None
+    if theme_inputs_dir.exists():
+        for f in theme_inputs_dir.iterdir():
+            if f.name.startswith("theme_image"):
+                theme_path = f
+                break
+    if not theme_path or not theme_path.exists():
+        raise HTTPException(status_code=404, detail="任务主题图不存在")
+
+    # Read task config
+    config_path = work_dir / "task_config.json"
+    if config_path.exists():
+        config = json.loads(config_path.read_text(encoding="utf-8"))
+    else:
+        config = {}
+
+    garment_type = config.get("garment_type", "T恤")
+    user_prompt = config.get("user_prompt", "")
+    neo_model = config.get("neo_model", "")
+    neo_size = config.get("neo_size", "")
+
+    # Update status before starting
+    from app.core.pipeline import _write_status
+    _write_status(task_id, "rendering", {
+        "phase": "rendering",
+        "completed_steps": ["vision_analysis", "prompt_generation", "neo_ai_generation", "front_split", "fill_plan"],
+        "current_step": "rendering_variants",
+    })
+
+    background_tasks.add_task(
+        run_pipeline,
+        task_id=task_id,
+        theme_image_path=theme_path,
+        garment_type=garment_type,
+        user_prompt=user_prompt,
+        neo_model=neo_model,
+        neo_size=neo_size,
+    )
+
+    return {
+        "task_id": task_id,
+        "status": "rendering",
+        "message": "已开始渲染，所有资产已就绪",
+    }

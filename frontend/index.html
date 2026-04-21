@@ -622,6 +622,93 @@
             box-shadow: inset 0 0 0 2px #007aff;
         }
 
+        .ref-placeholder.uploading {
+            display: flex !important;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            color: var(--accent);
+            font-weight: 600;
+        }
+
+        .ref-placeholder.uploading::before {
+            content: '';
+            width: 18px;
+            height: 18px;
+            border: 2px solid rgba(198, 92, 55, 0.2);
+            border-top-color: #c65c37;
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        .reference-item.dragover {
+            border-color: rgba(198, 92, 55, 0.6);
+            box-shadow: 0 0 0 3px rgba(198, 92, 55, 0.15);
+        }
+
+        .reference-item .img-wrap {
+            position: relative;
+            flex: 1;
+            min-height: 0;
+            border-radius: 16px;
+            overflow: hidden;
+        }
+
+        .reference-item .img-wrap img {
+            width: 100%;
+            height: 100%;
+            object-fit: contain;
+            display: block;
+        }
+
+        .replace-overlay {
+            position: absolute;
+            inset: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: rgba(21, 24, 33, 0.55);
+            color: #fff;
+            font-size: 13px;
+            font-weight: 600;
+            opacity: 0;
+            transition: opacity 0.2s ease;
+            cursor: pointer;
+            border-radius: 16px;
+        }
+
+        .reference-item[data-can-replace="true"]:hover .replace-overlay {
+            opacity: 1;
+        }
+
+        .btn-render {
+            min-height: 36px;
+            padding: 8px 16px;
+            border: none;
+            border-radius: 999px;
+            font-size: 13px;
+            font-weight: 600;
+            cursor: pointer;
+            color: #fff;
+            background: linear-gradient(135deg, #4ab37e, #3a8f63);
+            box-shadow: 0 6px 18px rgba(74, 179, 126, 0.28);
+            transition: transform 0.22s ease, opacity 0.22s ease;
+        }
+
+        .btn-render:hover {
+            transform: translateY(-1px);
+        }
+
+        .btn-render:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            transform: none;
+        }
+
         .continue-preview {
             cursor: default !important;
             min-height: auto !important;
@@ -699,9 +786,23 @@
             color: rgba(255, 247, 239, 0.64);
         }
 
-        .download-wrap .btn-primary {
+        .download-btns {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+            justify-content: flex-end;
+        }
+        .download-btns .btn-primary {
             width: auto;
-            min-width: 180px;
+            min-width: 120px;
+        }
+
+        .download-wrap .btn-primary:disabled {
+            opacity: 0.45;
+            cursor: not-allowed;
+            background: linear-gradient(135deg, #999, #777);
+            box-shadow: none;
+            transform: none;
         }
 
         .empty-state {
@@ -812,8 +913,13 @@
                 align-items: stretch;
             }
 
-            .download-wrap .btn-primary {
+            .download-btns {
                 width: 100%;
+                justify-content: stretch;
+            }
+            .download-btns .btn-primary {
+                flex: 1;
+                min-width: 0;
             }
         }
     </style>
@@ -874,45 +980,7 @@
                 </div>
 
                 <button class="btn btn-primary" id="submitBtn" onclick="submitTask()">开始生成</button>
-            </div>
-
-            <div class="card hidden" id="continueTaskCard">
-                <h3>继续任务</h3>
-                <p class="card-intro">从历史任务继续补图、重试或推进当前生产链。</p>
-
-                <div class="form-group">
-                    <label>主题图</label>
-                    <div class="upload-area continue-preview" id="continueUploadArea">
-                        <p id="continueImagePlaceholder" style="color:rgba(247, 242, 234, 0.72);">加载中...</p>
-                        <img id="continueThemeImage" src="" alt="主题图" style="max-width:100%; max-height:200px; border-radius:14px; display:none;">
-                    </div>
-                </div>
-
-                <div class="form-group">
-                    <label for="garmentTypeContinue">服装类型</label>
-                    <select id="garmentTypeContinue">
-                        <option value="T恤">T恤 / T-shirt / 衬衫</option>
-                        <option value="防晒服">防晒服 / 防晒衣</option>
-                    </select>
-                </div>
-
-                <div class="form-group">
-                    <label for="userPromptContinue">用户提示（可选）</label>
-                    <input type="text" id="userPromptContinue" placeholder="例如：强化插画感、改成柔和配色">
-                </div>
-
-                <div class="form-group hidden">
-                    <label for="neoModelContinue">生图模型（可选）</label>
-                    <input type="text" id="neoModelContinue" placeholder="gemini-3-pro-image-preview">
-                </div>
-
-                <div class="form-group hidden">
-                    <label for="neoSizeContinue">尺寸（可选）</label>
-                    <input type="text" id="neoSizeContinue" placeholder="2K">
-                </div>
-
-                <button class="btn btn-primary" id="retryBtn" onclick="retryTask()" disabled>继续执行</button>
-                <button class="btn btn-secondary" onclick="switchMode('new')">返回新建</button>
+                <button class="btn btn-secondary hidden" id="retryBtn" onclick="retryTask()">重新执行</button>
             </div>
 
             <div class="card" id="taskListCard">
@@ -932,7 +1000,7 @@
                             <h3>生产状态</h3>
                             <p>用一条明确的进度条和状态文本追踪这次任务当前进行到了哪一步。</p>
                         </div>
-                        <div class="surface-tag">Live Status</div>
+                        <div class="surface-tag">状态追踪</div>
                     </div>
 
                     <div class="progress-shell">
@@ -950,43 +1018,60 @@
                             <h3>参考图与中间素材</h3>
                             <p>这里集中放主题图、主图和三组纹理。</p>
                         </div>
-                        <div class="surface-tag">Asset Board</div>
+                        <div style="display:flex;align-items:center;gap:10px;">
+                            <button class="btn-render hidden" id="continueRenderBtn" onclick="continueRender()">继续渲染</button>
+                            <div class="surface-tag">素材面板</div>
+                        </div>
                     </div>
 
                     <div class="reference-grid" id="referenceImagesGrid">
                         <div class="reference-item" data-type="theme">
                             <div class="ref-label">主题图（参考）</div>
-                            <img id="refThemeImg" src="" alt="主题图" style="display:none;">
+                            <div class="img-wrap">
+                                <img id="refThemeImg" src="" alt="主题图" style="display:none;">
+                            </div>
                             <div class="ref-placeholder" id="refThemePlaceholder">等待上传...</div>
                             <div class="ref-status ref-status-pending" id="refThemeStatus">等待上传</div>
                         </div>
 
                         <div class="reference-item" data-type="hero">
                             <div class="ref-label">主图</div>
-                            <img id="refHeroImg" src="" alt="主图" style="display:none;">
+                            <div class="img-wrap" onclick="triggerAssetUpload('hero')">
+                                <img id="refHeroImg" src="" alt="主图" style="display:none;">
+                                <div class="replace-overlay">点击替换</div>
+                            </div>
                             <div class="ref-placeholder upload-trigger" id="refHeroPlaceholder" onclick="triggerAssetUpload('hero')">等待生成...</div>
                             <div class="ref-status ref-status-pending" id="refHeroStatus">等待中</div>
                         </div>
 
-                        <div class="reference-item" data-type="main">
+                        <div class="reference-item" data-type="texture_1">
                             <div class="ref-label">纹理 1</div>
-                            <img id="refMainImg" src="" alt="纹理1" style="display:none;">
-                            <div class="ref-placeholder upload-trigger" id="refMainPlaceholder" onclick="triggerAssetUpload('main')">等待生成...</div>
-                            <div class="ref-status ref-status-pending" id="refMainStatus">等待中</div>
+                            <div class="img-wrap" onclick="triggerAssetUpload('texture_1')">
+                                <img id="refTexture_1Img" src="" alt="纹理1" style="display:none;">
+                                <div class="replace-overlay">点击替换</div>
+                            </div>
+                            <div class="ref-placeholder upload-trigger" id="refTexture_1Placeholder" onclick="triggerAssetUpload('texture_1')">等待生成...</div>
+                            <div class="ref-status ref-status-pending" id="refTexture_1Status">等待中</div>
                         </div>
 
-                        <div class="reference-item" data-type="secondary">
+                        <div class="reference-item" data-type="texture_2">
                             <div class="ref-label">纹理 2</div>
-                            <img id="refSecondaryImg" src="" alt="纹理2" style="display:none;">
-                            <div class="ref-placeholder upload-trigger" id="refSecondaryPlaceholder" onclick="triggerAssetUpload('secondary')">等待生成...</div>
-                            <div class="ref-status ref-status-pending" id="refSecondaryStatus">等待中</div>
+                            <div class="img-wrap" onclick="triggerAssetUpload('texture_2')">
+                                <img id="refTexture_2Img" src="" alt="纹理2" style="display:none;">
+                                <div class="replace-overlay">点击替换</div>
+                            </div>
+                            <div class="ref-placeholder upload-trigger" id="refTexture_2Placeholder" onclick="triggerAssetUpload('texture_2')">等待生成...</div>
+                            <div class="ref-status ref-status-pending" id="refTexture_2Status">等待中</div>
                         </div>
 
-                        <div class="reference-item" data-type="accent_light">
+                        <div class="reference-item" data-type="texture_3">
                             <div class="ref-label">纹理 3</div>
-                            <img id="refAccent_lightImg" src="" alt="纹理3" style="display:none;">
-                            <div class="ref-placeholder upload-trigger" id="refAccent_lightPlaceholder" onclick="triggerAssetUpload('accent_light')">等待生成...</div>
-                            <div class="ref-status ref-status-pending" id="refAccent_lightStatus">等待中</div>
+                            <div class="img-wrap" onclick="triggerAssetUpload('texture_3')">
+                                <img id="refTexture_3Img" src="" alt="纹理3" style="display:none;">
+                                <div class="replace-overlay">点击替换</div>
+                            </div>
+                            <div class="ref-placeholder upload-trigger" id="refTexture_3Placeholder" onclick="triggerAssetUpload('texture_3')">等待生成...</div>
+                            <div class="ref-status ref-status-pending" id="refTexture_3Status">等待中</div>
                         </div>
                         <input type="file" id="assetFileInput" accept="image/*" style="display:none" onchange="handleAssetUpload(this)">
                     </div>
@@ -1000,7 +1085,7 @@
                                     <h3 class="results-title">生成结果</h3>
                                     <p>查看对位检查图和白底预览，快速确认不同纹理版本是否已经到可审查状态。</p>
                                 </div>
-                                <div class="surface-tag">Variant Review</div>
+                                <div class="surface-tag">结果预览</div>
                             </div>
                             <div class="preview-grid" id="previewGrid">
                                 <div class="empty-state">这里会显示每个纹理版本的对位检查图和白底预览。</div>
@@ -1013,9 +1098,9 @@
                             <div class="surface-head">
                                 <div>
                                     <h3 class="results-title">裁片预览</h3>
-                                    <p>主裁片会按部件拆开展示，方便快速排查局部纹理效果。</p>
+                                    <p>裁片会按部件拆开展示，方便快速排查局部纹理效果。</p>
                                 </div>
-                                <div class="surface-tag">Piece Detail</div>
+                                <div class="surface-tag">裁片细节</div>
                             </div>
                             <div class="pieces-grid" id="piecesGrid">
                                 <div class="empty-state">任务完成后，这里会自动填充裁片缩略图。</div>
@@ -1024,10 +1109,13 @@
 
                         <div class="download-wrap">
                             <div>
-                                <strong style="display:block; font-size:20px;">导出完整结果包</strong>
-                                <p>下载 ZIP，带走本次任务生成的全部关键产物。</p>
+                                <strong style="display:block; font-size:20px;">导出结果包 (ZIP)</strong>
+                                <p>带走本次任务生成的全部关键产物。</p>
                             </div>
-                            <button class="btn btn-primary" onclick="downloadResults()">下载结果 (ZIP)</button>
+                            <div class="download-btns">
+                                <button class="btn btn-primary" id="downloadPngBtn" onclick="downloadPngPackage()" disabled>导出 PNG</button>
+                                <button class="btn btn-primary" id="downloadSvgBtn" onclick="downloadSvgPackage()" disabled>导出 SVG</button>
+                            </div>
                         </div>
                     </div>
                 </section>
@@ -1044,13 +1132,14 @@
         let currentTaskId = null;
         let selectedTaskId = null;
         let pollInterval = null;
+        let lastPolledStatus = null;
 
         function phaseDisplayName(status) {
             return {
                 pending: '等待中',
                 analyzing: '分析中',
                 generating: '生图中',
-                rendering: '渲染中',
+                rendering: '渲染完成',
                 completed: '已完成',
                 failed: '失败',
                 waiting_assets: '待补图',
@@ -1131,15 +1220,10 @@
         }
 
         function switchMode(mode) {
-            document.getElementById('newTaskCard').classList.toggle('hidden', mode !== 'new');
-            document.getElementById('continueTaskCard').classList.toggle('hidden', mode !== 'continue');
             if (mode === 'new') {
                 selectedTaskId = null;
                 document.querySelectorAll('.task-item').forEach(el => el.classList.remove('selected'));
-                document.getElementById('retryBtn').disabled = true;
-                document.getElementById('continueThemeImage').style.display = 'none';
-                document.getElementById('continueThemeImage').src = '';
-                document.getElementById('continueImagePlaceholder').textContent = '加载中...';
+                // sidebar always stays in new-task mode
                 document.getElementById('progressCard').classList.add('hidden');
                 document.getElementById('referenceImagesCard').classList.add('hidden');
                 document.getElementById('resultsCard').style.display = 'grid';
@@ -1201,30 +1285,8 @@
             document.querySelectorAll('.task-item').forEach(el => el.classList.remove('selected'));
             const el = document.querySelector(`.task-item[data-task-id="${taskId}"]`);
             if (el) el.classList.add('selected');
-            document.getElementById('retryBtn').disabled = false;
             document.getElementById('resultsCard').style.display = 'grid';
             updateWorkspaceHero(taskId, 'pending', '正在读取任务详情与主题图。右侧会切换到当前任务的完整上下文。');
-
-            const img = document.getElementById('continueThemeImage');
-            const placeholder = document.getElementById('continueImagePlaceholder');
-            img.style.display = 'none';
-            placeholder.textContent = '加载中...';
-            placeholder.style.display = 'block';
-
-            try {
-                const res = await fetch(`/api/v1/tasks/${taskId}/theme_image`);
-                if (res.ok) {
-                    const blob = await res.blob();
-                    const url = URL.createObjectURL(blob);
-                    img.src = url;
-                    img.style.display = 'block';
-                    placeholder.style.display = 'none';
-                } else {
-                    placeholder.textContent = '主题图加载失败';
-                }
-            } catch (err) {
-                placeholder.textContent = '主题图加载失败';
-            }
 
             try {
                 const res = await fetch(`/api/v1/tasks/${taskId}`);
@@ -1235,21 +1297,26 @@
                     updateProgress(data);
                     updateReferenceImages(taskId, data.progress, data.status);
                     if (data.status === 'completed') {
+                        setDownloadEnabled(true);
                         showResults();
                     } else if (data.status === 'pending' || data.status === 'analyzing' || data.status === 'generating' || data.status === 'rendering' || data.status === 'waiting_assets') {
+                        setDownloadEnabled(false);
                         document.getElementById('previewGrid').innerHTML = '<div class="empty-state">任务处理中，预览图会在完成后自动刷新。</div>';
                         document.getElementById('piecesGrid').innerHTML = '<div class="empty-state">任务处理中，裁片缩略图会在完成后自动刷新。</div>';
                         startPolling();
                     } else {
+                        setDownloadEnabled(false);
                         document.getElementById('previewGrid').innerHTML = '<div class="empty-state">暂无结果</div>';
                         document.getElementById('piecesGrid').innerHTML = '<div class="empty-state">暂无结果</div>';
                     }
                 }
             } catch (err) {
                 console.error(err);
+                // Force hide continue render button on error to avoid stuck UI
+                document.getElementById('continueRenderBtn').classList.add('hidden');
             }
 
-            switchMode('continue');
+            // Keep sidebar in new-task mode, show task details on the right
         }
 
         async function submitTask() {
@@ -1279,8 +1346,19 @@
                 document.getElementById('resultsCard').style.display = 'grid';
                 document.getElementById('previewGrid').innerHTML = '<div class="empty-state">任务已提交，系统会在完成后填充这里的结果。</div>';
                 document.getElementById('piecesGrid').innerHTML = '<div class="empty-state">任务已提交，裁片缩略图会在渲染后出现。</div>';
+                setDownloadEnabled(false);
                 resetReferenceImages();
-                loadTasks();
+                // Reset form
+                fileInput.value = '';
+                document.getElementById('imagePreview').innerHTML = '';
+                document.getElementById('garmentType').selectedIndex = 0;
+                document.getElementById('userPrompt').value = '';
+                document.getElementById('neoModel').value = '';
+                document.getElementById('neoSize').value = '';
+                btn.disabled = false;
+                btn.textContent = '开始生成';
+                await loadTasks();
+                selectTask(currentTaskId);
                 startPolling();
             } catch (err) {
                 alert('错误: ' + err.message);
@@ -1298,13 +1376,13 @@
             const btn = document.getElementById('retryBtn');
             btn.disabled = true;
             btn.textContent = '提交中...';
-            updateWorkspaceHero(selectedTaskId, 'pending', '继续执行已选任务，系统会在已有上下文基础上继续往下跑。');
+            updateWorkspaceHero(selectedTaskId, 'pending', '重新执行已选任务，系统会在已有上下文基础上继续往下跑。');
 
             const form = new FormData();
-            form.append('garment_type', document.getElementById('garmentTypeContinue').value);
-            form.append('user_prompt', document.getElementById('userPromptContinue').value);
-            form.append('neo_model', document.getElementById('neoModelContinue').value);
-            form.append('neo_size', document.getElementById('neoSizeContinue').value);
+            form.append('garment_type', document.getElementById('garmentType').value);
+            form.append('user_prompt', document.getElementById('userPrompt').value);
+            form.append('neo_model', document.getElementById('neoModel').value);
+            form.append('neo_size', document.getElementById('neoSize').value);
 
             try {
                 const res = await fetch(`/api/v1/tasks/${selectedTaskId}/retry`, { method: 'POST', body: form });
@@ -1328,6 +1406,7 @@
 
         function startPolling() {
             if (pollInterval) clearInterval(pollInterval);
+            lastPolledStatus = null;
             pollInterval = setInterval(pollStatus, 3000);
             pollStatus();
         }
@@ -1339,11 +1418,22 @@
                 const data = await res.json();
                 updateProgress(data);
                 updateReferenceImages(currentTaskId, data.progress, data.status);
-                if (data.status === 'completed' || data.status === 'failed') {
+                if (lastPolledStatus !== data.status) {
+                    lastPolledStatus = data.status;
+                    loadTasks();
+                }
+                if (data.status === 'completed') {
                     clearInterval(pollInterval);
                     pollInterval = null;
-                    loadTasks();
-                    if (data.status === 'completed') showResults();
+                    setDownloadEnabled(true);
+                    showResults();
+                } else if (data.status === 'failed') {
+                    clearInterval(pollInterval);
+                    pollInterval = null;
+                }
+                // Hide continue render button when not in waiting_assets
+                if (data.status !== 'waiting_assets') {
+                    document.getElementById('continueRenderBtn').classList.add('hidden');
                 }
             } catch (err) {
                 console.error(err);
@@ -1353,24 +1443,21 @@
         function resetReferenceImages() {
             const themeImg = document.getElementById('refThemeImg');
             const themePlaceholder = document.getElementById('refThemePlaceholder');
-            themeImg.style.display = 'none';
-            themeImg.src = '';
-            themePlaceholder.style.display = 'flex';
-            themePlaceholder.textContent = '等待上传...';
-            document.getElementById('refThemeStatus').textContent = '等待上传';
-            document.getElementById('refThemeStatus').className = 'ref-status ref-status-pending';
+            if (themeImg) { themeImg.style.display = 'none'; themeImg.src = ''; }
+            if (themePlaceholder) { themePlaceholder.style.display = 'flex'; themePlaceholder.textContent = '等待上传...'; }
+            const themeStatus = document.getElementById('refThemeStatus');
+            if (themeStatus) { themeStatus.textContent = '等待上传'; themeStatus.className = 'ref-status ref-status-pending'; }
 
-            ['hero', 'main', 'secondary', 'accent_light'].forEach(type => {
+            ['hero', 'texture_1', 'texture_2', 'texture_3'].forEach(type => {
                 const cap = type.charAt(0).toUpperCase() + type.slice(1);
                 const img = document.getElementById('ref' + cap + 'Img');
                 const placeholder = document.getElementById('ref' + cap + 'Placeholder');
                 const status = document.getElementById('ref' + cap + 'Status');
-                img.style.display = 'none';
-                img.src = '';
-                placeholder.style.display = 'flex';
-                placeholder.textContent = '等待生成...';
-                status.textContent = '等待中';
-                status.className = 'ref-status ref-status-pending';
+                const item = img ? img.closest('.reference-item') : null;
+                if (img) { img.style.display = 'none'; img.src = ''; }
+                if (placeholder) { placeholder.style.display = 'flex'; placeholder.textContent = '等待生成...'; placeholder.classList.remove('upload-trigger'); }
+                if (status) { status.textContent = '等待中'; status.className = 'ref-status ref-status-pending'; }
+                if (item) item.setAttribute('data-can-replace', 'false');
             });
         }
 
@@ -1379,6 +1466,9 @@
             const img = document.getElementById('ref' + cap + 'Img');
             const placeholder = document.getElementById('ref' + cap + 'Placeholder');
             const statusEl = document.getElementById('ref' + cap + 'Status');
+            if (!img || !placeholder || !statusEl) return;
+            const imgWrap = img.closest('.img-wrap');
+            const item = imgWrap ? imgWrap.closest('.reference-item') : null;
 
             let st = 'pending';
             if (typeof statusInfo === 'string') {
@@ -1388,6 +1478,15 @@
             }
 
             const isWaitingAssets = globalStatus === 'waiting_assets';
+            const canReplace = isWaitingAssets || globalStatus === 'completed';
+            if (item) {
+                item.setAttribute('data-can-replace', canReplace ? 'true' : 'false');
+            }
+            if (canReplace) {
+                placeholder.classList.add('upload-trigger');
+            } else {
+                placeholder.classList.remove('upload-trigger');
+            }
             statusEl.textContent = {
                 pending: isWaitingAssets ? '等待上传' : '等待中',
                 running: '生成中',
@@ -1402,23 +1501,26 @@
                 if (!img.src || img.src.split('?')[0] !== imageUrl) {
                     img.onerror = function() {
                         img.style.display = 'none';
+                        if (imgWrap) imgWrap.style.display = 'none';
                         placeholder.style.display = 'flex';
                         placeholder.textContent = '暂无图片';
                     };
                     img.onload = function() {
                         img.style.display = 'block';
+                        if (imgWrap) imgWrap.style.display = 'flex';
                         placeholder.style.display = 'none';
                     };
                     img.src = newSrc;
                 } else {
-                    // Already showing correct image, ensure visibility
                     img.style.display = 'block';
+                    if (imgWrap) imgWrap.style.display = 'flex';
                     placeholder.style.display = 'none';
                 }
             } else if (st === 'failed') {
                 placeholder.style.display = 'flex';
                 placeholder.textContent = '生成失败';
                 img.style.display = 'none';
+                if (imgWrap) imgWrap.style.display = 'none';
                 img.src = '';
             } else {
                 placeholder.style.display = 'flex';
@@ -1430,6 +1532,7 @@
                     placeholder.textContent = '等待生成...';
                 }
                 img.style.display = 'none';
+                if (imgWrap) imgWrap.style.display = 'none';
                 img.src = '';
             }
         }
@@ -1440,18 +1543,27 @@
 
             const themeImg = document.getElementById('refThemeImg');
             const themePlaceholder = document.getElementById('refThemePlaceholder');
+            const themeImgWrap = themeImg ? themeImg.closest('.img-wrap') : null;
             const themeUrl = `/api/v1/tasks/${taskId}/theme_image`;
-            if (!themeImg.src || themeImg.src.split('?')[0] !== themeUrl) {
-                themeImg.onerror = function() {
-                    themeImg.style.display = 'none';
-                    themePlaceholder.style.display = 'flex';
-                    themePlaceholder.textContent = '暂无主题图';
-                };
-                themeImg.onload = function() {
+            if (themeImg) {
+                if (!themeImg.src || themeImg.src.split('?')[0] !== themeUrl) {
+                    themeImg.onerror = function() {
+                        themeImg.style.display = 'none';
+                        if (themeImgWrap) themeImgWrap.style.display = 'none';
+                        if (themePlaceholder) themePlaceholder.style.display = 'flex';
+                        if (themePlaceholder) themePlaceholder.textContent = '暂无主题图';
+                    };
+                    themeImg.onload = function() {
+                        themeImg.style.display = 'block';
+                        if (themeImgWrap) themeImgWrap.style.display = 'flex';
+                        if (themePlaceholder) themePlaceholder.style.display = 'none';
+                    };
+                    themeImg.src = themeUrl + '?t=' + Date.now();
+                } else {
                     themeImg.style.display = 'block';
-                    themePlaceholder.style.display = 'none';
-                };
-                themeImg.src = themeUrl + '?t=' + Date.now();
+                    if (themeImgWrap) themeImgWrap.style.display = 'flex';
+                    if (themePlaceholder) themePlaceholder.style.display = 'none';
+                }
             }
             const refStatus = detail.reference_image;
             let themeSt = 'pending';
@@ -1461,18 +1573,21 @@
                 themeSt = refStatus.status;
             }
             const themeStatusEl = document.getElementById('refThemeStatus');
-            themeStatusEl.textContent = {
-                pending: '等待上传',
-                uploading: '上传中',
-                completed: '已上传',
-                failed: '上传失败',
-            }[themeSt] || themeSt;
-            themeStatusEl.className = 'ref-status ref-status-' + themeSt;
+            if (themeStatusEl) {
+                themeStatusEl.textContent = {
+                    pending: '等待上传',
+                    uploading: '上传中',
+                    completed: '已上传',
+                    failed: '上传失败',
+                }[themeSt] || themeSt;
+                themeStatusEl.className = 'ref-status ref-status-' + themeSt;
+            }
 
             updateReferenceImageItem('hero', detail.hero_motif, `/api/v1/tasks/${taskId}/hero_motif`, globalStatus);
-            updateReferenceImageItem('main', detail.main, `/api/v1/tasks/${taskId}/textures/main`, globalStatus);
-            updateReferenceImageItem('secondary', detail.secondary, `/api/v1/tasks/${taskId}/textures/secondary`, globalStatus);
-            updateReferenceImageItem('accent_light', detail.accent_light, `/api/v1/tasks/${taskId}/textures/accent_light`, globalStatus);
+            updateReferenceImageItem('texture_1', detail.texture_1, `/api/v1/tasks/${taskId}/textures/texture_1`, globalStatus);
+            updateReferenceImageItem('texture_2', detail.texture_2, `/api/v1/tasks/${taskId}/textures/texture_2`, globalStatus);
+            updateReferenceImageItem('texture_3', detail.texture_3, `/api/v1/tasks/${taskId}/textures/texture_3`, globalStatus);
+            checkAllAssetsReady();
         }
 
         function updateProgress(data) {
@@ -1494,7 +1609,7 @@
                     pending: '等待中...',
                     analyzing: '视觉分析中...',
                     generating: 'AI 生图中...',
-                    rendering: '渲染裁片中...',
+                    rendering: '渲染完成',
                     completed: '已完成',
                     failed: '失败',
                 };
@@ -1514,11 +1629,13 @@
         }
 
         function _textureNumber(tid) {
-            const map = { main: 1, secondary: 2, accent_light: 3 };
+            const map = { texture_1: 1, texture_2: 2, texture_3: 3 };
             return map[tid] || tid;
         }
 
         async function showResults() {
+            if (showingResults) return;
+            showingResults = true;
             document.getElementById('resultsCard').style.display = 'grid';
             const previewGrid = document.getElementById('previewGrid');
             previewGrid.innerHTML = '';
@@ -1567,12 +1684,16 @@
                 `;
                 piecesGrid.appendChild(div);
             }
+            showingResults = false;
         }
 
         let pendingUploadType = null;
+        let showingResults = false;
 
         function triggerAssetUpload(type) {
             if (!currentTaskId) return;
+            const item = document.querySelector(`.reference-item[data-type="${type}"]`);
+            if (item && item.getAttribute('data-can-replace') !== 'true') return;
             pendingUploadType = type;
             document.getElementById('assetFileInput').click();
         }
@@ -1587,7 +1708,14 @@
             const cap = type.charAt(0).toUpperCase() + type.slice(1);
             const placeholder = document.getElementById('ref' + cap + 'Placeholder');
             const statusEl = document.getElementById('ref' + cap + 'Status');
+            const img = document.getElementById('ref' + cap + 'Img');
+            if (!img || !placeholder || !statusEl) {
+                alert('上传失败: 页面元素未找到，请刷新页面');
+                return;
+            }
+            const imgWrap = img.closest('.img-wrap');
             placeholder.textContent = '上传中...';
+            placeholder.classList.add('uploading');
             statusEl.textContent = '上传中';
             statusEl.className = 'ref-status ref-status-running';
 
@@ -1595,7 +1723,9 @@
             form.append('file', file);
 
             let url;
-            if (type === 'hero') {
+            if (type === 'theme') {
+                url = `/api/v1/tasks/${currentTaskId}/theme_image`;
+            } else if (type === 'hero') {
                 url = `/api/v1/tasks/${currentTaskId}/hero_motif`;
             } else {
                 url = `/api/v1/tasks/${currentTaskId}/textures/${type}`;
@@ -1605,30 +1735,136 @@
                 const res = await fetch(url, { method: 'POST', body: form });
                 const data = await res.json();
                 if (!res.ok) throw new Error(data.detail || '上传失败');
-                const img = document.getElementById('ref' + cap + 'Img');
                 img.onerror = function() {
                     img.style.display = 'none';
+                    if (imgWrap) imgWrap.style.display = 'none';
                     placeholder.style.display = 'flex';
                     placeholder.textContent = '暂无图片';
                 };
                 img.onload = function() {
                     img.style.display = 'block';
+                    if (imgWrap) imgWrap.style.display = 'flex';
                     placeholder.style.display = 'none';
                 };
-                img.src = (type === 'hero' ? `/api/v1/tasks/${currentTaskId}/hero_motif` : `/api/v1/tasks/${currentTaskId}/textures/${type}`) + '?t=' + Date.now();
+                if (type === 'theme') {
+                    img.src = `/api/v1/tasks/${currentTaskId}/theme_image?t=` + Date.now();
+                } else if (type === 'hero') {
+                    img.src = `/api/v1/tasks/${currentTaskId}/hero_motif?t=` + Date.now();
+                } else {
+                    img.src = `/api/v1/tasks/${currentTaskId}/textures/${type}?t=` + Date.now();
+                }
+                placeholder.classList.remove('uploading');
                 statusEl.textContent = '已完成';
                 statusEl.className = 'ref-status ref-status-completed';
+                checkAllAssetsReady();
             } catch (err) {
                 alert('上传失败: ' + err.message);
+                placeholder.classList.remove('uploading');
                 placeholder.textContent = '上传失败';
                 statusEl.textContent = '失败';
                 statusEl.className = 'ref-status ref-status-failed';
             }
         }
 
+        function checkAllAssetsReady() {
+            const btn = document.getElementById('continueRenderBtn');
+            if (!currentTaskId) {
+                btn.classList.add('hidden');
+                return;
+            }
+            const types = ['hero', 'texture_1', 'texture_2', 'texture_3'];
+            const allReady = types.every(type => {
+                const cap = type.charAt(0).toUpperCase() + type.slice(1);
+                const statusEl = document.getElementById('ref' + cap + 'Status');
+                return statusEl && statusEl.classList.contains('ref-status-completed');
+            });
+            // Only show continue render button in waiting_assets status
+            const globalStatus = lastPolledStatus || '';
+            const canShow = allReady && globalStatus === 'waiting_assets';
+            btn.classList.toggle('hidden', !canShow);
+        }
+
+        async function continueRender() {
+            if (!currentTaskId) return;
+            const btn = document.getElementById('continueRenderBtn');
+            btn.disabled = true;
+            btn.textContent = '渲染中...';
+            try {
+                const res = await fetch(`/api/v1/tasks/${currentTaskId}/continue_render`, { method: 'POST' });
+                const data = await res.json();
+                if (!res.ok) throw new Error(data.detail || '渲染启动失败');
+                document.getElementById('progressCard').classList.remove('hidden');
+                document.getElementById('resultsCard').style.display = 'grid';
+                startPolling();
+                // Force hide continue render button after a short delay regardless of polling
+                setTimeout(() => {
+                    document.getElementById('continueRenderBtn').classList.add('hidden');
+                }, 8000);
+            } catch (err) {
+                alert('渲染启动失败: ' + err.message);
+                btn.disabled = false;
+                btn.textContent = '继续渲染';
+            }
+        }
+
+        // Drag-and-drop for reference items (skip theme image)
+        function setupReferenceDragDrop() {
+            document.querySelectorAll('.reference-item').forEach(item => {
+                const type = item.dataset.type;
+                if (!type || type === 'theme') return;
+
+                item.addEventListener('dragover', (e) => {
+                    e.preventDefault();
+                    item.classList.add('dragover');
+                });
+                item.addEventListener('dragleave', () => {
+                    item.classList.remove('dragover');
+                });
+                item.addEventListener('drop', (e) => {
+                    e.preventDefault();
+                    item.classList.remove('dragover');
+                    const files = e.dataTransfer.files;
+                    if (files.length && currentTaskId) {
+                        pendingUploadType = type;
+                        const input = document.getElementById('assetFileInput');
+                        input.files = files;
+                        handleAssetUpload(input);
+                    }
+                });
+            });
+        }
+        setupReferenceDragDrop();
+
+        function setDownloadEnabled(enabled) {
+            const pngBtn = document.getElementById('downloadPngBtn');
+            const svgBtn = document.getElementById('downloadSvgBtn');
+            if (pngBtn) pngBtn.disabled = !enabled;
+            if (svgBtn) svgBtn.disabled = !enabled;
+        }
+
+        function _triggerDownload(url, filename) {
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = filename;
+            document.body.appendChild(a);
+            a.click();
+            setTimeout(() => a.remove(), 100);
+        }
+
+        function downloadPngPackage() {
+            if (!currentTaskId) return;
+            _triggerDownload(`/api/v1/tasks/${currentTaskId}/download/png`, `auto_garment_${currentTaskId}_png.zip`);
+        }
+
+        function downloadSvgPackage() {
+            if (!currentTaskId) return;
+            _triggerDownload(`/api/v1/tasks/${currentTaskId}/download/svg`, `auto_garment_${currentTaskId}_svg.zip`);
+        }
+
         function downloadResults() {
             if (!currentTaskId) return;
-            window.open(`/api/v1/tasks/${currentTaskId}/download`, '_blank');
+            _triggerDownload(`/api/v1/tasks/${currentTaskId}/download`, `auto_garment_${currentTaskId}.zip`);
+            document.body.removeChild(a);
         }
 
         async function deleteTask(taskId) {

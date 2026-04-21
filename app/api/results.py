@@ -11,6 +11,11 @@ from fastapi.responses import FileResponse, StreamingResponse
 from app.config import settings
 from app.models.schemas import AutomationSummary
 
+try:
+    import vtracer
+except Exception:
+    vtracer = None
+
 router = APIRouter()
 
 
@@ -79,7 +84,7 @@ async def get_hero_motif(task_id: str):
 @router.get("/tasks/{task_id}/textures/{texture_id}")
 async def get_texture(task_id: str, texture_id: str):
     """Get a generated texture image."""
-    if texture_id not in {"main", "secondary", "accent_light"}:
+    if texture_id not in {"texture_1", "texture_2", "texture_3"}:
         raise HTTPException(status_code=400, detail="无效的纹理ID")
     task_dir = _task_dir(task_id)
     path = task_dir / "neo_textures" / f"{texture_id}.png"
@@ -95,9 +100,9 @@ async def get_preview(task_id: str, variant: str = ""):
         path = _task_dir(task_id) / "variants" / variant / "preview.png"
         if path.exists():
             return FileResponse(path, media_type="image/png")
-    path = _task_dir(task_id) / "variants" / "main" / "preview.png"
+    path = _task_dir(task_id) / "variants" / "texture_1" / "preview.png"
     if not path.exists():
-        for v in ["main", "secondary", "accent_light"]:
+        for v in ["texture_1", "texture_2", "texture_3"]:
             path = _task_dir(task_id) / "variants" / v / "preview.png"
             if path.exists():
                 break
@@ -112,9 +117,9 @@ async def get_front_pair_check(task_id: str, variant: str = ""):
     if variant:
         path = _task_dir(task_id) / "variants" / variant / "front_pair_check.png"
     else:
-        path = _task_dir(task_id) / "variants" / "main" / "front_pair_check.png"
+        path = _task_dir(task_id) / "variants" / "texture_1" / "front_pair_check.png"
         if not path.exists():
-            for v in ["main", "secondary", "accent_light"]:
+            for v in ["texture_1", "texture_2", "texture_3"]:
                 path = _task_dir(task_id) / "variants" / v / "front_pair_check.png"
                 if path.exists():
                     break
@@ -130,9 +135,9 @@ async def get_preview_white(task_id: str, variant: str = ""):
         path = _task_dir(task_id) / "variants" / variant / "preview_white.jpg"
         if path.exists():
             return FileResponse(path, media_type="image/jpeg")
-    path = _task_dir(task_id) / "variants" / "main" / "preview_white.jpg"
+    path = _task_dir(task_id) / "variants" / "texture_1" / "preview_white.jpg"
     if not path.exists():
-        for v in ["main", "secondary", "accent_light"]:
+        for v in ["texture_1", "texture_2", "texture_3"]:
             path = _task_dir(task_id) / "variants" / v / "preview_white.jpg"
             if path.exists():
                 break
@@ -145,7 +150,7 @@ async def get_preview_white(task_id: str, variant: str = ""):
 async def get_piece(task_id: str, piece_id: str):
     """Get a single rendered piece PNG."""
     # Search in main variant first
-    for variant in ["main", "secondary", "accent_light"]:
+    for variant in ["texture_1", "texture_2", "texture_3"]:
         path = _task_dir(task_id) / "variants" / variant / "pieces" / f"{piece_id}.png"
         if path.exists():
             return FileResponse(path, media_type="image/png")
@@ -161,6 +166,35 @@ async def get_summary(task_id: str):
     data = json.loads(path.read_text(encoding="utf-8"))
     data["task_id"] = task_id
     return data
+
+
+@router.post("/tasks/{task_id}/theme_image")
+async def replace_theme_image(task_id: str, file: UploadFile = File(...)):
+    """Replace the theme image for a task."""
+    task_dir = _task_dir(task_id)
+    if not task_dir.exists():
+        raise HTTPException(status_code=404, detail="任务不存在")
+    theme_inputs_dir = task_dir / "theme_inputs"
+    theme_inputs_dir.mkdir(parents=True, exist_ok=True)
+
+    # Clear existing theme images
+    for f in theme_inputs_dir.iterdir():
+        if f.name.startswith("theme_image"):
+            f.unlink()
+
+    # Clear cached reference URL so it gets re-uploaded on next pipeline run
+    ref_url_path = task_dir / "reference_image_url.txt"
+    if ref_url_path.exists():
+        ref_url_path.unlink()
+
+    suffix = Path(file.filename or "upload.png").suffix
+    if suffix.lower() not in {".png", ".jpg", ".jpeg", ".webp", ".bmp"}:
+        suffix = ".png"
+    dest = theme_inputs_dir / f"theme_image{suffix}"
+    data = await file.read()
+    dest.write_bytes(data)
+    _update_detail_field(task_id, "reference_image", {"status": "completed", "path": str(dest.resolve())})
+    return {"ok": True, "path": str(dest.resolve())}
 
 
 @router.post("/tasks/{task_id}/hero_motif")
@@ -184,7 +218,7 @@ async def upload_hero_motif(task_id: str, file: UploadFile = File(...)):
 @router.post("/tasks/{task_id}/textures/{texture_id}")
 async def upload_texture(task_id: str, texture_id: str, file: UploadFile = File(...)):
     """Manually upload a texture image."""
-    if texture_id not in {"main", "secondary", "accent_light"}:
+    if texture_id not in {"texture_1", "texture_2", "texture_3"}:
         raise HTTPException(status_code=400, detail="无效的纹理ID")
     task_dir = _task_dir(task_id)
     if not task_dir.exists():
@@ -198,32 +232,97 @@ async def upload_texture(task_id: str, texture_id: str, file: UploadFile = File(
     return {"ok": True, "path": str(dest.resolve())}
 
 
-@router.get("/tasks/{task_id}/download")
-async def download_results(task_id: str):
-    """Download preview PNGs as a ZIP archive (preview1/2/3.png only)."""
-    task_dir = _task_dir(task_id)
-    if not task_dir.exists():
-        raise HTTPException(status_code=404, detail="任务不存在")
+def _ensure_svg(png_path: Path, svg_path: Path) -> bool:
+    """Convert PNG to SVG using vtracer if SVG does not exist."""
+    if svg_path.exists():
+        return True
+    if not png_path.exists():
+        return False
+    if vtracer is None:
+        return False
+    try:
+        vtracer.convert_image_to_svg_py(str(png_path), str(svg_path))
+        return svg_path.exists()
+    except Exception as e:
+        print(f"[WARN] PNG to SVG conversion failed for {png_path}: {e}")
+        return False
 
-    png_map = {"main": "preview1.png", "secondary": "preview2.png", "accent_light": "preview3.png"}
-    svg_map = {"main": "preview1.svg", "secondary": "preview2.svg", "accent_light": "preview3.svg"}
 
+def _build_ext_zip(task_dir: Path, ext: str) -> io.BytesIO:
+    """Build ZIP buffer for a single file extension (png or svg)."""
     buffer = io.BytesIO()
     with zipfile.ZipFile(buffer, "w", zipfile.ZIP_DEFLATED) as zf:
         variants_dir = task_dir / "variants"
         if variants_dir.exists():
-            for variant_name, zip_name in png_map.items():
-                preview = variants_dir / variant_name / "preview.png"
-                if preview.exists():
-                    zf.write(preview, zip_name)
-            for variant_name, zip_name in svg_map.items():
-                preview = variants_dir / variant_name / "preview.svg"
-                if preview.exists():
-                    zf.write(preview, zip_name)
-
+            for i, variant_name in enumerate(["texture_1", "texture_2", "texture_3"], 1):
+                file_path = variants_dir / variant_name / f"preview.{ext}"
+                if file_path.exists():
+                    zf.write(file_path, f"preview{i}.{ext}")
     buffer.seek(0)
+    return buffer
+
+
+@router.get("/tasks/{task_id}/download")
+async def download_results(task_id: str):
+    """Download preview PNGs and SVGs as a ZIP archive (backward compat)."""
+    return await _download_package(task_id, "pngsvg")
+
+
+@router.get("/tasks/{task_id}/download/png")
+async def download_png_package(task_id: str):
+    """Download preview PNGs as a ZIP archive."""
+    return await _download_package(task_id, "png")
+
+
+@router.get("/tasks/{task_id}/download/svg")
+async def download_svg_package(task_id: str):
+    """Download preview SVGs as a ZIP archive."""
+    return await _download_package(task_id, "svg")
+
+
+async def _download_package(task_id: str, kind: str):
+    """Internal: build and return a ZIP of PNGs, SVGs, or both."""
+    import asyncio
+    task_dir = _task_dir(task_id)
+    if not task_dir.exists():
+        raise HTTPException(status_code=404, detail="任务不存在")
+
+    variants_dir = task_dir / "variants"
+    if variants_dir.exists() and kind in ("svg", "pngsvg"):
+        # Pre-generate missing SVGs
+        svg_tasks = []
+        for variant_name in ["texture_1", "texture_2", "texture_3"]:
+            svg_path = variants_dir / variant_name / "preview.svg"
+            if not svg_path.exists():
+                png_path = variants_dir / variant_name / "preview.png"
+                if png_path.exists():
+                    svg_tasks.append(asyncio.to_thread(_ensure_svg, png_path, svg_path))
+        if svg_tasks:
+            await asyncio.gather(*svg_tasks, return_exceptions=True)
+
+    if kind == "png":
+        buffer = await asyncio.to_thread(_build_ext_zip, task_dir, "png")
+        filename = f"auto_garment_{task_id}_png.zip"
+    elif kind == "svg":
+        buffer = await asyncio.to_thread(_build_ext_zip, task_dir, "svg")
+        filename = f"auto_garment_{task_id}_svg.zip"
+    else:
+        # pngsvg — backward compat, both in one zip
+        buffer = io.BytesIO()
+        with zipfile.ZipFile(buffer, "w", zipfile.ZIP_DEFLATED) as zf:
+            if variants_dir.exists():
+                for i, variant_name in enumerate(["texture_1", "texture_2", "texture_3"], 1):
+                    png_path = variants_dir / variant_name / "preview.png"
+                    if png_path.exists():
+                        zf.write(png_path, f"preview{i}.png")
+                    svg_path = variants_dir / variant_name / "preview.svg"
+                    if svg_path.exists():
+                        zf.write(svg_path, f"preview{i}.svg")
+        buffer.seek(0)
+        filename = f"auto_garment_{task_id}.zip"
+
     return StreamingResponse(
         buffer,
         media_type="application/zip",
-        headers={"Content-Disposition": f"attachment; filename=auto_garment_{task_id}.zip"},
+        headers={"Content-Disposition": f"attachment; filename={filename}"},
     )

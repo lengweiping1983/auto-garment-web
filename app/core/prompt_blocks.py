@@ -38,9 +38,9 @@ HERO_NEGATIVE_EN = (
 )
 
 PANEL_DEFAULTS_EN = {
-    "main": "seamless tileable visible repeat pattern with concrete small botanical or geometric motifs on pale ground, stable low-to-medium density, clearly repeatable elements, commercial apparel base fabric, no abstract wash, no plain texture, no paper grain only, no gradient, no empty background, no tonal atmosphere only, no blurred background, no scene, no landscape, no text",
-    "secondary": "seamless tileable coordinating visible repeat pattern with concrete small motifs, lattice, linework, leaves, dots, or controlled geometric elements, stable repeat structure on light ground, same palette, no abstract wash, no plain texture, no paper grain only, no gradient, no empty background, no tonal atmosphere only, no scene, no text",
-    "accent_light": "tiny scattered small-scale pattern on light ground, controlled density, no text",
+    "texture_1": "seamless tileable visible repeat pattern with concrete small botanical or geometric motifs on pale ground, stable low-to-medium density, clearly repeatable elements, commercial apparel base fabric, no abstract wash, no plain texture, no paper grain only, no gradient, no empty background, no tonal atmosphere only, no blurred background, no scene, no landscape, no text",
+    "texture_2": "seamless tileable coordinating visible repeat pattern with concrete small motifs, lattice, linework, leaves, dots, or controlled geometric elements, stable repeat structure on light ground, same palette, no abstract wash, no plain texture, no paper grain only, no gradient, no empty background, no tonal atmosphere only, no scene, no text",
+    "texture_3": "tiny scattered small-scale pattern on light ground, controlled density, no text",
     "hero_motif_1": "isolated foreground hero motif only, centered complete subject, transparent PNG cutout, real alpha background, preserve and recreate the primary subject from the user's reference image as much as possible, keep the recognizable silhouette, color identity, pose, proportions, and key visual details, full head and hair visible, uncropped subject, generous transparent margin above and around the subject, no background, no checkerboard transparency preview, no background art, no scenery, no garden, no foliage behind subject, no botanical backdrop, no painted wash, no rectangular composition, no full illustration scene, no vignette, no ground shadow, no text",
 }
 
@@ -114,11 +114,11 @@ def build_single_texture_prompt_en(
     family_contract: str = "",
 ) -> str:
     """Build the final English prompt for one standalone textile texture."""
-    prompt = texture_prompt or PANEL_DEFAULTS_EN.get(texture_id, PANEL_DEFAULTS_EN["main"])
+    prompt = texture_prompt or PANEL_DEFAULTS_EN.get(texture_id, PANEL_DEFAULTS_EN["texture_1"])
     role_line = {
-        "main": "Main fabric: quiet low-to-medium density repeat for large body pieces.",
-        "secondary": "Secondary fabric: coordinating repeat for sleeves, back body, or supporting pieces.",
-        "accent_light": "Light accent fabric: small-scale repeat for controlled visual variation.",
+        "texture_1": "Texture 1: quiet low-to-medium density repeat for large body pieces.",
+        "texture_2": "Texture 2: coordinating repeat for sleeves, back body, or supporting pieces.",
+        "texture_3": "Texture 3: small-scale repeat for controlled visual variation.",
     }.get(texture_id, "Commercial apparel fabric repeat.")
 
     contract_text = family_contract or build_family_contract_text(style)

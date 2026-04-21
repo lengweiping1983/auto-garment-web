@@ -18,12 +18,8 @@ from datetime import datetime
 from pathlib import Path
 
 from app.config import settings
-from app.core.image_utils import extract_palette
 from app.core.neo_ai_client import NeoAIClient
-from app.core.prompt_blocks import (
-    build_single_texture_prompt_en,
-    build_transparent_hero_prompt_en,
-)
+
 from PIL import Image
 from app.core.renderer import render_all, compose_preview
 from app.services.front_split_service import create_front_split_assets, inject_front_split_motifs
@@ -125,65 +121,12 @@ def _build_texture_set(
     texture_paths: dict[str, Path],
     hero_motif_path: Path | None,
     prompt_map: dict[str, str],
-    palette: dict,
 ) -> Path:
     """Build root texture_set.json from generated assets."""
-    ordered_ids = ["main", "secondary", "accent_light"]
+    ordered_ids = ["texture_1", "texture_2", "texture_3"]
     available = [tid for tid in ordered_ids if texture_paths.get(tid)]
     if not available:
         raise RuntimeError("没有可写入 texture_set.json 的单纹理资产。")
-
-    fallback_path = texture_paths[available[0]]
-    from PIL import ImageColor
-    
-    def _brightness(hex_str):
-        try:
-            r, g, b = ImageColor.getrgb(hex_str)
-            return r + g + b
-        except Exception:
-            return 0
-
-    secondary_img = Image.open(texture_paths.get("secondary") or fallback_path)
-    accent_img = Image.open(texture_paths.get("accent_light") or fallback_path)
-
-    # quiet_solid from accent
-    sample = accent_img.convert("RGB").resize((160, 160), Image.Resampling.LANCZOS)
-    quantized = sample.quantize(colors=8, method=Image.Quantize.MEDIANCUT)
-    pal = quantized.getpalette() or []
-    from collections import Counter
-    used = Counter(quantized.getdata())
-    quiet_solid = "#6f9a4d"
-    for index, _ in used.most_common(4):
-        offset = index * 3
-        if offset + 2 >= len(pal):
-            continue
-        rgb = tuple(pal[offset:offset + 3])
-        brightness = sum(rgb) / 3
-        if brightness < 20 or brightness > 250:
-            continue
-        quiet_solid = "#{:02x}{:02x}{:02x}".format(*rgb)
-        break
-
-    # moss_color from secondary
-    sample2 = secondary_img.convert("RGB").resize((160, 160), Image.Resampling.LANCZOS)
-    quantized2 = sample2.quantize(colors=8, method=Image.Quantize.MEDIANCUT)
-    pal2 = quantized2.getpalette() or []
-    used2 = Counter(quantized2.getdata())
-    moss_color = "#6f9a4d"
-    for index, _ in used2.most_common(4):
-        offset = index * 3
-        if offset + 2 >= len(pal2):
-            continue
-        rgb = tuple(pal2[offset:offset + 3])
-        brightness = sum(rgb) / 3
-        if brightness < 20 or brightness > 250:
-            continue
-        moss_color = "#{:02x}{:02x}{:02x}".format(*rgb)
-        break
-
-    warm_ivory = "#f3f1df"
-    if palette and palette.get("primary"):
-        warm_ivory = max(palette["primary"], key=_brightness)
 
     textures = []
     for texture_id in available:
@@ -207,11 +150,7 @@ def _build_texture_set(
         "missing_textures": [tid for tid in ordered_ids if tid not in available],
         "textures": textures,
         "motifs": [],
-        "solids": [
-            {"solid_id": "quiet_solid", "color": quiet_solid, "approved": True, "candidate": False},
-            {"solid_id": "quiet_moss", "color": moss_color, "approved": True, "candidate": False},
-            {"solid_id": "warm_ivory", "color": warm_ivory, "approved": True, "candidate": False},
-        ],
+        "solids": [],
     }
     path = out_dir / "texture_set.json"
     _write_json(path, texture_set)
@@ -346,16 +285,15 @@ async def _upload_reference_image(
 
 async def _gen_hero(
     neo: NeoAIClient,
-    prompt_map: dict[str, str],
+    prompt: str,
+    negative_prompt: str,
     ref_url: str,
     model: str,
     size: str,
     hero_dir: Path,
     task_id: str,
-    style: dict | None = None,
-    hero_edge_contract: dict | None = None,
 ) -> Path | Exception:
-    """Generate hero motif. Returns Path on success, Exception on failure."""
+    """Generate hero motif. Uses LLM prompt directly — no wrapping."""
     _write_status(task_id, "generating", {
         "phase": "neo_ai_generation",
         "completed_steps": ["vision_analysis", "prompt_generation"],
@@ -363,20 +301,9 @@ async def _gen_hero(
     })
     _update_detail_field(task_id, "hero_motif", {"status": "running"})
     try:
-        wrapped_prompt = build_transparent_hero_prompt_en(
-            prompt_map.get("hero_motif_1", ""),
-            style=style,
-            edge_contract=hero_edge_contract,
-        )
         task_code = await neo.submit_generation(
-            prompt=wrapped_prompt,
-            negative_prompt=(
-                "text, labels, captions, titles, typography, words, letters, signage, logo, watermark, "
-                "plain light box, colored background box, filled rectangle, background art, scenery, landscape, environment, "
-                "checkerboard transparency preview, fake transparency grid, "
-                "full illustration scene, poster composition, sticker sheet, garment mockup, fashion model, mannequin, "
-                "person wearing garment, product photo, lookbook, semi-transparent full-image patch"
-            ),
+            prompt=prompt,
+            negative_prompt=negative_prompt,
             model=model,
             size=size,
             reference_images=[ref_url] if ref_url else None,
@@ -389,16 +316,15 @@ async def _gen_hero(
 async def _gen_texture(
     neo: NeoAIClient,
     tid: str,
-    prompt_map: dict[str, str],
+    prompt: str,
+    negative_prompt: str,
     ref_url: str,
     model: str,
     size: str,
     texture_root: Path,
     task_id: str,
-    style: dict | None = None,
-    family_contract: str = "",
 ) -> Path | Exception:
-    """Generate single texture. Returns Path on success, Exception on failure."""
+    """Generate single texture. Uses LLM prompt directly — no wrapping."""
     _write_status(task_id, "generating", {
         "phase": "neo_ai_generation",
         "completed_steps": ["vision_analysis", "prompt_generation"],
@@ -408,14 +334,9 @@ async def _gen_texture(
     work = texture_root / tid
     work.mkdir(parents=True, exist_ok=True)
     try:
-        wrapped_prompt = build_single_texture_prompt_en(
-            tid,
-            prompt_map.get(tid, ""),
-            style=style,
-            family_contract=family_contract,
-        )
         task_code = await neo.submit_generation(
-            prompt=wrapped_prompt,
+            prompt=prompt,
+            negative_prompt=negative_prompt,
             model=model,
             size=size,
             reference_images=[ref_url] if ref_url else None,
@@ -434,7 +355,6 @@ async def _process_variant_when_ready(
     hero_path: Path | None,
     front_split_assets: dict | None,
     prompt_map: dict[str, str],
-    palette: dict,
     pieces_payload: dict,
     garment_map: dict,
     visual: dict,
@@ -453,9 +373,9 @@ async def _process_variant_when_ready(
         "detail": {
             "reference_image": {"status": "completed"},
             "hero_motif": {"status": "completed" if hero_path else "failed", "path": str(hero_path) if hero_path else ""},
-            "main": {"status": "completed" if "main" in texture_paths else "failed", "path": str(texture_paths.get("main", ""))},
-            "secondary": {"status": "completed" if "secondary" in texture_paths else "failed", "path": str(texture_paths.get("secondary", ""))},
-            "accent_light": {"status": "completed" if "accent_light" in texture_paths else "failed", "path": str(texture_paths.get("accent_light", ""))},
+            "texture_1": {"status": "completed" if "texture_1" in texture_paths else "failed", "path": str(texture_paths.get("texture_1", ""))},
+            "texture_2": {"status": "completed" if "texture_2" in texture_paths else "failed", "path": str(texture_paths.get("texture_2", ""))},
+            "texture_3": {"status": "completed" if "texture_3" in texture_paths else "failed", "path": str(texture_paths.get("texture_3", ""))},
             "variants": {tid: "rendering"},
         },
     })
@@ -465,7 +385,7 @@ async def _process_variant_when_ready(
 
     # Build texture_set with currently available textures
     texture_set_path = await asyncio.to_thread(
-        _build_texture_set, work_dir, texture_paths, hero_path, prompt_map, palette
+        _build_texture_set, work_dir, texture_paths, hero_path, prompt_map
     )
     if front_split_assets:
         inject_front_split_motifs(texture_set_path, front_split_assets)
@@ -509,9 +429,9 @@ async def _process_variant_when_ready(
         "detail": {
             "reference_image": {"status": "completed"},
             "hero_motif": {"status": "completed" if hero_path else "failed", "path": str(hero_path) if hero_path else ""},
-            "main": {"status": "completed" if "main" in texture_paths else "failed", "path": str(texture_paths.get("main", ""))},
-            "secondary": {"status": "completed" if "secondary" in texture_paths else "failed", "path": str(texture_paths.get("secondary", ""))},
-            "accent_light": {"status": "completed" if "accent_light" in texture_paths else "failed", "path": str(texture_paths.get("accent_light", ""))},
+            "texture_1": {"status": "completed" if "texture_1" in texture_paths else "failed", "path": str(texture_paths.get("texture_1", ""))},
+            "texture_2": {"status": "completed" if "texture_2" in texture_paths else "failed", "path": str(texture_paths.get("texture_2", ""))},
+            "texture_3": {"status": "completed" if "texture_3" in texture_paths else "failed", "path": str(texture_paths.get("texture_3", ""))},
             "variants": {tid: "completed"},
         },
     })
@@ -588,7 +508,7 @@ async def run_pipeline(
             texture_root = work_dir / "neo_textures"
             paths = {}
             if texture_root.exists():
-                for tid in ["main", "secondary", "accent_light"]:
+                for tid in ["texture_1", "texture_2", "texture_3"]:
                     p = texture_root / f"{tid}.png"
                     if p.exists():
                         print(f"[RESUME] Loading texture {tid} from {p}")
@@ -679,7 +599,7 @@ async def run_pipeline(
 
         # Determine what needs generation
         needs_hero = hero_path is None
-        texture_ids = ["main", "secondary", "accent_light"]
+        texture_ids = ["texture_1", "texture_2", "texture_3"]
         needs_textures = [tid for tid in texture_ids if tid not in texture_paths]
 
         # Test mode: wait for manual uploads if assets are missing
@@ -691,9 +611,9 @@ async def run_pipeline(
                 "detail": {
                     "reference_image": {"status": "completed"},
                     "hero_motif": {"status": "pending" if needs_hero else "completed"},
-                    "main": {"status": "pending" if "main" not in texture_paths else "completed"},
-                    "secondary": {"status": "pending" if "secondary" not in texture_paths else "completed"},
-                    "accent_light": {"status": "pending" if "accent_light" not in texture_paths else "completed"},
+                    "texture_1": {"status": "pending" if "texture_1" not in texture_paths else "completed"},
+                    "texture_2": {"status": "pending" if "texture_2" not in texture_paths else "completed"},
+                    "texture_3": {"status": "pending" if "texture_3" not in texture_paths else "completed"},
                 },
             })
             while needs_hero or needs_textures:
@@ -726,8 +646,7 @@ async def run_pipeline(
                     texture_set["_base_dir"] = str(work_dir.resolve())
                 print("[RESUME] Fill plan already exists, skipping.")
             else:
-                palette = visual.get("palette", {})
-                texture_set_path = _build_texture_set(work_dir, texture_paths, hero_path, prompt_map, palette)
+                texture_set_path = _build_texture_set(work_dir, texture_paths, hero_path, prompt_map)
                 if front_split_assets:
                     inject_front_split_motifs(texture_set_path, front_split_assets)
 
@@ -810,8 +729,8 @@ async def run_pipeline(
                 })
 
             # Write summary
-            default_summary = next((s for s in variant_summaries if s["纹理ID"] == "main"), variant_summaries[0] if variant_summaries else None)
-            default_rendered_dir = Path(default_summary["渲染目录"]) if default_summary else work_dir / "variants" / "main"
+            default_summary = next((s for s in variant_summaries if s["纹理ID"] == "texture_1"), variant_summaries[0] if variant_summaries else None)
+            default_rendered_dir = Path(default_summary["渲染目录"]) if default_summary else work_dir / "variants" / "texture_1"
 
             summary = {
                 "单纹理资产": str((work_dir / "neo_textures").resolve()),
@@ -841,9 +760,9 @@ async def run_pipeline(
                 "detail": {
                     "reference_image": {"status": "completed"},
                     "hero_motif": {"status": "completed", "path": str(hero_path) if hero_path else ""},
-                    "main": {"status": "completed", "path": str(texture_paths.get("main", ""))},
-                    "secondary": {"status": "completed", "path": str(texture_paths.get("secondary", ""))},
-                    "accent_light": {"status": "completed", "path": str(texture_paths.get("accent_light", ""))},
+                    "texture_1": {"status": "completed", "path": str(texture_paths.get("texture_1", ""))},
+                    "texture_2": {"status": "completed", "path": str(texture_paths.get("texture_2", ""))},
+                    "texture_3": {"status": "completed", "path": str(texture_paths.get("texture_3", ""))},
                 },
             })
             return
@@ -856,15 +775,24 @@ async def run_pipeline(
         hero_task = None
         texture_tasks = {}
 
-        style = visual.get("style", {})
-        hero_edge_contract = visual.get("hero_edge_contract", {})
-        family_contract = texture_prompts.get("family_contract", "")
+        # Build negative prompt lookup from LLM-generated texture_prompts
+        negative_map = {p["texture_id"]: p.get("negative_prompt", "") for p in texture_prompts.get("prompts", [])}
 
         if needs_hero:
-            hero_task = asyncio.create_task(_gen_hero(neo, prompt_map, ref_url, model, size, hero_dir, task_id, style, hero_edge_contract))
+            hero_task = asyncio.create_task(_gen_hero(
+                neo,
+                prompt_map.get("hero_motif_1", ""),
+                negative_map.get("hero_motif_1", ""),
+                ref_url, model, size, hero_dir, task_id,
+            ))
 
         for tid in needs_textures:
-            texture_tasks[tid] = asyncio.create_task(_gen_texture(neo, tid, prompt_map, ref_url, model, size, texture_root, task_id, style, family_contract))
+            texture_tasks[tid] = asyncio.create_task(_gen_texture(
+                neo, tid,
+                prompt_map.get(tid, ""),
+                negative_map.get(tid, ""),
+                ref_url, model, size, texture_root, task_id,
+            ))
 
         # Stream processing loop
         pending = set()
@@ -887,7 +815,12 @@ async def run_pipeline(
                         if not hero_retried:
                             print("[RETRY] Hero generation failed, retrying once...")
                             hero_retried = True
-                            hero_task = asyncio.create_task(_gen_hero(neo, prompt_map, ref_url, model, size, hero_dir, task_id, style, hero_edge_contract))
+                            hero_task = asyncio.create_task(_gen_hero(
+                                neo,
+                                prompt_map.get("hero_motif_1", ""),
+                                negative_map.get("hero_motif_1", ""),
+                                ref_url, model, size, hero_dir, task_id,
+                            ))
                             pending.add(hero_task)
                         else:
                             print(f"[ERROR] Hero generation failed after retry: {result}")
@@ -905,7 +838,7 @@ async def run_pipeline(
                             if t_tid not in processed_variants:
                                 await _process_variant_when_ready(
                                     t_tid, texture_paths, hero_path, front_split_assets,
-                                    prompt_map, visual.get("palette", {}), pieces_payload, garment_map, visual,
+                                    prompt_map, pieces_payload, garment_map, visual,
                                     work_dir, task_id
                                 )
                                 processed_variants.add(t_tid)
@@ -922,7 +855,7 @@ async def run_pipeline(
                         if hero_path and front_split_done and tid not in processed_variants:
                             await _process_variant_when_ready(
                                 tid, texture_paths, hero_path, front_split_assets,
-                                prompt_map, visual.get("palette", {}), pieces_payload, garment_map, visual,
+                                prompt_map, pieces_payload, garment_map, visual,
                                 work_dir, task_id
                             )
                             processed_variants.add(tid)
@@ -935,9 +868,9 @@ async def run_pipeline(
                     "detail": {
                         "reference_image": {"status": "completed", "url": ref_url},
                         "hero_motif": {"status": "failed" if (not hero_path and hero_retried) else ("completed" if hero_path else "running"), "path": str(hero_path) if hero_path else ""},
-                        "main": {"status": "completed" if "main" in texture_paths else ("failed" if "main" in texture_errors else "running"), "path": str(texture_paths.get("main", ""))},
-                        "secondary": {"status": "completed" if "secondary" in texture_paths else ("failed" if "secondary" in texture_errors else "running"), "path": str(texture_paths.get("secondary", ""))},
-                        "accent_light": {"status": "completed" if "accent_light" in texture_paths else ("failed" if "accent_light" in texture_errors else "running"), "path": str(texture_paths.get("accent_light", ""))},
+                        "texture_1": {"status": "completed" if "texture_1" in texture_paths else ("failed" if "texture_1" in texture_errors else "running"), "path": str(texture_paths.get("texture_1", ""))},
+                        "texture_2": {"status": "completed" if "texture_2" in texture_paths else ("failed" if "texture_2" in texture_errors else "running"), "path": str(texture_paths.get("texture_2", ""))},
+                        "texture_3": {"status": "completed" if "texture_3" in texture_paths else ("failed" if "texture_3" in texture_errors else "running"), "path": str(texture_paths.get("texture_3", ""))},
                     },
                 })
 
@@ -954,14 +887,13 @@ async def run_pipeline(
                 if hero_path:
                     await _process_variant_when_ready(
                         t_tid, texture_paths, hero_path, front_split_assets,
-                        prompt_map, visual.get("palette", {}), pieces_payload, garment_map, visual,
+                        prompt_map, pieces_payload, garment_map, visual,
                         work_dir, task_id
                     )
                     processed_variants.add(t_tid)
 
         # Fallback: render any variants not yet processed (e.g. hero failed but textures exist)
-        palette = visual.get("palette", {})
-        texture_set_path = await asyncio.to_thread(_build_texture_set, work_dir, texture_paths, hero_path, prompt_map, palette)
+        texture_set_path = await asyncio.to_thread(_build_texture_set, work_dir, texture_paths, hero_path, prompt_map)
         if front_split_assets:
             inject_front_split_motifs(texture_set_path, front_split_assets)
         texture_set = json.loads(texture_set_path.read_text(encoding="utf-8"))
@@ -1032,8 +964,8 @@ async def run_pipeline(
                 })
 
         # Write summary
-        default_summary = next((s for s in variant_summaries if s["纹理ID"] == "main"), variant_summaries[0] if variant_summaries else None)
-        default_rendered_dir = Path(default_summary["渲染目录"]) if default_summary else work_dir / "variants" / "main"
+        default_summary = next((s for s in variant_summaries if s["纹理ID"] == "texture_1"), variant_summaries[0] if variant_summaries else None)
+        default_rendered_dir = Path(default_summary["渲染目录"]) if default_summary else work_dir / "variants" / "texture_1"
 
         summary = {
             "单纹理资产": str((work_dir / "neo_textures").resolve()),
@@ -1063,9 +995,9 @@ async def run_pipeline(
             "detail": {
                 "reference_image": {"status": "completed"},
                 "hero_motif": {"status": "failed" if not hero_path else "completed", "path": str(hero_path) if hero_path else ""},
-                "main": {"status": "completed" if "main" in texture_paths else "failed", "path": str(texture_paths.get("main", ""))},
-                "secondary": {"status": "completed" if "secondary" in texture_paths else "failed", "path": str(texture_paths.get("secondary", ""))},
-                "accent_light": {"status": "completed" if "accent_light" in texture_paths else "failed", "path": str(texture_paths.get("accent_light", ""))},
+                "texture_1": {"status": "completed" if "texture_1" in texture_paths else "failed", "path": str(texture_paths.get("texture_1", ""))},
+                "texture_2": {"status": "completed" if "texture_2" in texture_paths else "failed", "path": str(texture_paths.get("texture_2", ""))},
+                "texture_3": {"status": "completed" if "texture_3" in texture_paths else "failed", "path": str(texture_paths.get("texture_3", ""))},
             },
         })
 

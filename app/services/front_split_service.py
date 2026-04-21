@@ -244,11 +244,17 @@ def inject_front_split_motifs(texture_set_path: str | Path, split_assets: dict) 
     except json.JSONDecodeError:
         text = text.replace("False", "false").replace("True", "true")
         data = json.loads(text)
+    full_path = split_assets.get("full") or split_assets.get("source")
+    left_path = split_assets.get("left")
+    right_path = split_assets.get("right")
+    if not full_path or not left_path or not right_path:
+        data["theme_front_split"] = split_assets
+        path.write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
+        return path
     motifs = [
         m for m in data.get("motifs", [])
         if m.get("motif_id") not in {"theme_front_full", "theme_front_left", "theme_front_right"}
     ]
-    full_path = split_assets.get("full") or split_assets.get("source")
     motifs.extend([
         {
             "motif_id": "theme_front_full",
@@ -264,7 +270,7 @@ def inject_front_split_motifs(texture_set_path: str | Path, split_assets: dict) 
         {
             "motif_id": "theme_front_left",
             "texture_id": "theme_front_left",
-            "path": split_assets["left"],
+            "path": left_path,
             "role": "front_left_theme",
             "approved": True,
             "candidate": False,
@@ -275,7 +281,7 @@ def inject_front_split_motifs(texture_set_path: str | Path, split_assets: dict) 
         {
             "motif_id": "theme_front_right",
             "texture_id": "theme_front_right",
-            "path": split_assets["right"],
+            "path": right_path,
             "role": "front_right_theme",
             "approved": True,
             "candidate": False,

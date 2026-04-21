@@ -266,7 +266,7 @@ def _ensure_svg(png_path: Path, svg_path: Path) -> bool:
 
 def _build_ext_zip(task_dir: Path, ext: str) -> io.BytesIO:
     """Build ZIP buffer for a single file extension (png or svg),
-    including previews and individual pieces for all variants."""
+    including previews for all variants."""
     buffer = io.BytesIO()
     with zipfile.ZipFile(buffer, "w", zipfile.ZIP_DEFLATED) as zf:
         variants_dir = task_dir / "variants"
@@ -276,13 +276,6 @@ def _build_ext_zip(task_dir: Path, ext: str) -> io.BytesIO:
                 file_path = variants_dir / variant_name / f"preview.{ext}"
                 if file_path.exists():
                     zf.write(file_path, f"preview{i}.{ext}")
-                # Individual pieces (PNG only; pieces have no SVG)
-                if ext == "png":
-                    pieces_dir = variants_dir / variant_name / "pieces"
-                    if pieces_dir.exists():
-                        for piece_file in sorted(pieces_dir.glob("*.png")):
-                            arcname = f"pieces/{variant_name}/{piece_file.name}"
-                            zf.write(piece_file, arcname)
     buffer.seek(0)
     return buffer
 
@@ -327,10 +320,10 @@ async def _download_package(task_id: str, kind: str):
 
     if kind == "png":
         buffer = await asyncio.to_thread(_build_ext_zip, task_dir, "png")
-        filename = f"auto_garment_{task_id}_png.zip"
+        filename = f"{task_id}.zip"
     elif kind == "svg":
         buffer = await asyncio.to_thread(_build_ext_zip, task_dir, "svg")
-        filename = f"auto_garment_{task_id}_svg.zip"
+        filename = f"{task_id}.zip"
     else:
         # pngsvg — backward compat, both in one zip, now includes pieces/
         buffer = io.BytesIO()
@@ -350,7 +343,7 @@ async def _download_package(task_id: str, kind: str):
                             arcname = f"pieces/{variant_name}/{piece_file.name}"
                             zf.write(piece_file, arcname)
         buffer.seek(0)
-        filename = f"auto_garment_{task_id}.zip"
+        filename = f"{task_id}.zip"
 
     return StreamingResponse(
         buffer,

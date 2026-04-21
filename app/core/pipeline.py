@@ -636,9 +636,20 @@ async def run_pipeline(
             assets_dir = work_dir / "assets"
             if assets_dir.exists():
                 full = assets_dir / "theme_front_full.png"
-                if full.exists():
-                    return {"theme_front_full": str(full.resolve())}
+                left = assets_dir / "theme_front_left.png"
+                right = assets_dir / "theme_front_right.png"
+                if full.exists() and left.exists() and right.exists():
+                    return {
+                        "full": str(full.resolve()),
+                        "left": str(left.resolve()),
+                        "right": str(right.resolve()),
+                    }
             return {}
+
+        def _has_complete_front_split_assets(split_assets: dict | None) -> bool:
+            if not isinstance(split_assets, dict):
+                return False
+            return bool(split_assets.get("full") and split_assets.get("left") and split_assets.get("right"))
 
         def _resume_fill_plan() -> tuple[dict, dict, Path, Path] | None:
             tsp = work_dir / "texture_set.json"
@@ -747,11 +758,12 @@ async def run_pipeline(
             print("[RESUME] All AI assets exist, skipping generation.")
             # Standard Phase 4-6
             front_split_assets = _resume_front_split()
-            if not front_split_assets and hero_path:
+            if not _has_complete_front_split_assets(front_split_assets) and hero_path:
                 try:
                     front_split_assets = create_front_split_assets(hero_path, work_dir)
                 except Exception as e:
                     print(f"[WARN] Front split failed: {e}")
+                    front_split_assets = {}
 
             resumed_fill = _resume_fill_plan()
             if resumed_fill:
@@ -930,6 +942,7 @@ async def run_pipeline(
 
         texture_id_by_task = {v: k for k, v in texture_tasks.items()}
         hero_retried = False
+        hero_error = ""
         front_split_done = False
         front_split_assets = {}
         processed_variants = set()
@@ -943,6 +956,7 @@ async def run_pipeline(
                         if not hero_retried:
                             print("[RETRY] Hero generation failed, retrying once...")
                             hero_retried = True
+                            hero_error = str(result)
                             hero_task = asyncio.create_task(_gen_hero(
                                 neo,
                                 prompt_map.get("hero_motif_1", ""),
@@ -951,6 +965,7 @@ async def run_pipeline(
                             ))
                             pending.add(hero_task)
                         else:
+                            hero_error = str(result)
                             print(f"[ERROR] Hero generation failed after retry: {result}")
                     else:
                         hero_path = result
@@ -997,10 +1012,26 @@ async def run_pipeline(
                 "detail": {
                     "render_runtime": render_runtime,
                     "reference_image": {"status": "completed", "url": ref_url},
-                        "hero_motif": {"status": "failed" if (not hero_path and hero_retried and not allow_missing_hero) else ("completed" if hero_path else ("pending" if allow_missing_hero else "running")), "path": str(hero_path) if hero_path else ""},
-                        "texture_1": {"status": "completed" if "texture_1" in texture_paths else ("failed" if "texture_1" in texture_errors else "running"), "path": str(texture_paths.get("texture_1", ""))},
-                        "texture_2": {"status": "completed" if "texture_2" in texture_paths else ("failed" if "texture_2" in texture_errors else "running"), "path": str(texture_paths.get("texture_2", ""))},
-                        "texture_3": {"status": "completed" if "texture_3" in texture_paths else ("failed" if "texture_3" in texture_errors else "running"), "path": str(texture_paths.get("texture_3", ""))},
+                        "hero_motif": {
+                            "status": "failed" if (not hero_path and hero_retried and not allow_missing_hero) else ("completed" if hero_path else ("pending" if allow_missing_hero else "running")),
+                            "path": str(hero_path) if hero_path else "",
+                            "error": hero_error if (not hero_path and hero_error) else "",
+                        },
+                        "texture_1": {
+                            "status": "completed" if "texture_1" in texture_paths else ("failed" if "texture_1" in texture_errors else "running"),
+                            "path": str(texture_paths.get("texture_1", "")),
+                            "error": texture_errors.get("texture_1", ""),
+                        },
+                        "texture_2": {
+                            "status": "completed" if "texture_2" in texture_paths else ("failed" if "texture_2" in texture_errors else "running"),
+                            "path": str(texture_paths.get("texture_2", "")),
+                            "error": texture_errors.get("texture_2", ""),
+                        },
+                        "texture_3": {
+                            "status": "completed" if "texture_3" in texture_paths else ("failed" if "texture_3" in texture_errors else "running"),
+                            "path": str(texture_paths.get("texture_3", "")),
+                            "error": texture_errors.get("texture_3", ""),
+                        },
                     },
                 })
 
@@ -1126,10 +1157,14 @@ async def run_pipeline(
             "detail": {
                 "render_runtime": render_runtime,
                 "reference_image": {"status": "completed"},
-                "hero_motif": {"status": ("completed" if hero_path else ("pending" if allow_missing_hero else "failed")), "path": str(hero_path) if hero_path else ""},
-                "texture_1": {"status": "completed" if "texture_1" in texture_paths else "failed", "path": str(texture_paths.get("texture_1", ""))},
-                "texture_2": {"status": "completed" if "texture_2" in texture_paths else "failed", "path": str(texture_paths.get("texture_2", ""))},
-                "texture_3": {"status": "completed" if "texture_3" in texture_paths else "failed", "path": str(texture_paths.get("texture_3", ""))},
+                "hero_motif": {
+                    "status": ("completed" if hero_path else ("pending" if allow_missing_hero else "failed")),
+                    "path": str(hero_path) if hero_path else "",
+                    "error": hero_error if (not hero_path and hero_error) else "",
+                },
+                "texture_1": {"status": "completed" if "texture_1" in texture_paths else "failed", "path": str(texture_paths.get("texture_1", "")), "error": texture_errors.get("texture_1", "")},
+                "texture_2": {"status": "completed" if "texture_2" in texture_paths else "failed", "path": str(texture_paths.get("texture_2", "")), "error": texture_errors.get("texture_2", "")},
+                "texture_3": {"status": "completed" if "texture_3" in texture_paths else "failed", "path": str(texture_paths.get("texture_3", "")), "error": texture_errors.get("texture_3", "")},
             },
         })
         clear_dirty_assets(task_id, all_assets=True)

@@ -1493,6 +1493,15 @@
             });
         }
 
+        function normalizeAssetErrorMessage(message) {
+            if (!message) return '';
+            return String(message)
+                .replace(/^Neo AI generation failed:\s*/i, '')
+                .replace(/^Generation failed:\s*/i, '')
+                .replace(/^Neo AI status check failed:\s*/i, '')
+                .trim();
+        }
+
         function isReferenceDeletable(type) {
             if (!['hero', 'texture_1', 'texture_2', 'texture_3'].includes(type)) return false;
             if (isRunningStatus(lastPolledStatus || '')) return false;
@@ -1598,10 +1607,12 @@
             const item = imgWrap ? imgWrap.closest('.reference-item') : null;
 
             let st = 'pending';
+            let errorMessage = '';
             if (typeof statusInfo === 'string') {
                 st = statusInfo;
             } else if (statusInfo && statusInfo.status) {
                 st = statusInfo.status;
+                errorMessage = normalizeAssetErrorMessage(statusInfo.error || '');
             }
 
             const isWaitingAssets = globalStatus === 'waiting_assets';
@@ -1656,7 +1667,8 @@
                 }
             } else if (st === 'failed') {
                 placeholder.style.display = 'flex';
-                placeholder.textContent = '生成失败';
+                placeholder.textContent = errorMessage || '生成失败';
+                placeholder.title = errorMessage || '生成失败';
                 img.style.display = 'none';
                 if (imgWrap) imgWrap.style.display = 'none';
                 img.src = '';
@@ -1667,6 +1679,7 @@
                 }
             } else {
                 placeholder.style.display = 'flex';
+                placeholder.title = '';
                 if (st === 'running') {
                     placeholder.textContent = '生成中...';
                 } else if (canReplace && st === 'pending') {
@@ -1738,6 +1751,21 @@
             updateReferenceImageItem('texture_1', detail.texture_1, apiUrl(`/api/v1/tasks/${taskId}/textures/texture_1`), globalStatus);
             updateReferenceImageItem('texture_2', detail.texture_2, apiUrl(`/api/v1/tasks/${taskId}/textures/texture_2`), globalStatus);
             updateReferenceImageItem('texture_3', detail.texture_3, apiUrl(`/api/v1/tasks/${taskId}/textures/texture_3`), globalStatus);
+
+            const assetErrors = [
+                ['主图', detail.hero_motif],
+                ['纹理 1', detail.texture_1],
+                ['纹理 2', detail.texture_2],
+                ['纹理 3', detail.texture_3],
+            ]
+                .filter(([, info]) => info && info.status === 'failed' && info.error)
+                .map(([label, info]) => `${label}: ${normalizeAssetErrorMessage(info.error)}`);
+
+            const errorTextEl = document.getElementById('errorText');
+            if (assetErrors.length > 0) {
+                errorTextEl.classList.remove('hidden');
+                errorTextEl.textContent = assetErrors.join(' | ');
+            }
             checkAllAssetsReady();
         }
 
@@ -1760,7 +1788,7 @@
                     pending: '等待中...',
                     analyzing: '视觉分析中...',
                     generating: 'AI 生图中...',
-                    rendering: '渲染完成',
+                    rendering: '渲染中...',
                     completed: '已完成',
                     failed: '失败',
                 };
@@ -1773,7 +1801,7 @@
             if (data.error) {
                 document.getElementById('errorText').classList.remove('hidden');
                 document.getElementById('errorText').textContent = data.error;
-            } else {
+            } else if (!(data.progress && data.progress.detail)) {
                 document.getElementById('errorText').classList.add('hidden');
                 document.getElementById('errorText').textContent = '';
             }

@@ -8,9 +8,11 @@ import json
 from pathlib import Path
 
 try:
-    from app.core.prompt_sanitizer import sanitize_prompt, sanitize_prompts_in_dict, sanitize_blur_risks
+    from app.core.prompt_sanitizer import sanitize_prompt, sanitize_prompt_for_image_generation, sanitize_prompts_in_dict, sanitize_blur_risks
 except Exception:
     def sanitize_prompt(text, domain="generic", prompt_role="positive"):
+        return text
+    def sanitize_prompt_for_image_generation(text, prompt_role="positive"):
         return text
     def sanitize_prompts_in_dict(data, keys=("prompt",), domain="generic"):
         return data
@@ -98,6 +100,7 @@ def generate_texture_prompts(visual: dict, out_dir: Path) -> tuple[dict[str, str
         # 3. Sanitize: stop-words, banned words, blur risks
         cleaned = sanitize_prompt(raw, domain="fashion")
         cleaned = sanitize_blur_risks(cleaned)
+        cleaned = sanitize_prompt_for_image_generation(cleaned, prompt_role="positive")
 
         purpose, panel, role, negative = meta[tid]
 
@@ -123,6 +126,9 @@ def generate_texture_prompts(visual: dict, out_dir: Path) -> tuple[dict[str, str
     texture_prompts = sanitize_prompts_in_dict(
         texture_prompts, keys=("prompt", "negative_prompt"), domain="fashion"
     )
+
+    for item in texture_prompts.get("prompts", []):
+        item["prompt"] = sanitize_prompt_for_image_generation(item.get("prompt", ""), prompt_role="positive")
 
     # Rebuild prompt_map after final sanitization
     prompt_map = {p["texture_id"]: p["prompt"] for p in texture_prompts["prompts"]}

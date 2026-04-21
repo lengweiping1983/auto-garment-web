@@ -15,7 +15,9 @@ Stable Diffusion / Imagen / Gemini 对这些词非常敏感，剥掉后模型可
 from __future__ import annotations
 
 from dataclasses import asdict, dataclass
+import json
 import re
+from pathlib import Path
 
 # 真正空洞的强调词（所有领域都应过滤）
 _STOP_WORDS_CORE = frozenset({
@@ -134,6 +136,48 @@ SAFE_PHRASE_REPLACEMENTS = (
     (r"\bdead\s+stock\b", "surplus stock"),
     (r"\bno\s+(?:blood|gore|violence|weapon|gun|knife|nude|nudity|sexual|porn|drug)s?\b", "apparel-safe content"),
 )
+
+# 图像生成平台的额外保守改写。目标是把容易误伤的商业设计表达改写成更中性的
+# 服装/面料语言，降低误判概率，而不是绕过内容安全策略。
+IMAGE_SAFE_PHRASE_REPLACEMENTS = (
+    (r"\bwoman\s+in\s+red\s+bikini\b", "woman in red retro swimwear"),
+    (r"\bman\s+in\s+swim\s+trunks\b", "man in retro beachwear"),
+    (r"\bbikini\b", "retro swimwear"),
+    (r"\bswimsuit\b", "retro swimwear"),
+    (r"\bbeach\b", "coastal"),
+    (r"\bsurfboard\s+silhouettes?\b", "board-shaped motifs"),
+    (r"\bsilhouettes?\b", "simplified shapes"),
+    (r"\bcommercial\s+apparel\s+textile\b", "apparel-safe textile design"),
+    (r"\bcommercial\s+garment\s+print\b", "apparel-safe print graphic"),
+    (r"\bpin-?up\b", "retro poster-inspired"),
+)
+
+_CONFIG_PATH = Path(__file__).resolve().parents[1] / "config_data" / "image_prompt_safety.json"
+
+
+def _load_image_prompt_safety_config() -> dict:
+    if not _CONFIG_PATH.exists():
+        return {}
+    try:
+        return json.loads(_CONFIG_PATH.read_text(encoding="utf-8"))
+    except Exception:
+        return {}
+
+
+IMAGE_PROMPT_SAFETY_CONFIG = _load_image_prompt_safety_config()
+
+
+def _config_phrase_rewrites() -> tuple[tuple[str, str], ...]:
+    items = IMAGE_PROMPT_SAFETY_CONFIG.get("image_generation_phrase_rewrites") or []
+    rewrites: list[tuple[str, str]] = []
+    for item in items:
+        if not isinstance(item, dict):
+            continue
+        pattern = item.get("pattern")
+        replacement = item.get("replacement")
+        if isinstance(pattern, str) and isinstance(replacement, str) and pattern and replacement:
+            rewrites.append((pattern, replacement))
+    return tuple(rewrites)
 
 
 @dataclass
@@ -464,6 +508,17 @@ def sanitize_prompt_with_report(text: str, domain: str = "generic", prompt_role:
 def sanitize_prompt(text: str, domain: str = "generic", prompt_role: str = "positive") -> str:
     """过滤提示词中的停用词、禁用词和噪音词。"""
     return sanitize_prompt_with_report(text, domain=domain, prompt_role=prompt_role).sanitized_text
+
+
+def sanitize_prompt_for_image_generation(text: str, prompt_role: str = "positive") -> str:
+    """Apply conservative rewrites before submitting prompts to image models."""
+    if not text or not isinstance(text, str):
+        return text
+    out = sanitize_prompt(text, domain="fashion", prompt_role=prompt_role)
+    phrase_rewrites = _config_phrase_rewrites() or IMAGE_SAFE_PHRASE_REPLACEMENTS
+    for pattern, replacement in phrase_rewrites:
+        out = re.sub(pattern, replacement, out, flags=re.IGNORECASE)
+    return _clean_joined_text(out)
 
 
 def sanitize_prompts_in_dict(data: dict, keys: tuple[str, ...] = ("prompt",), domain: str = "generic") -> dict:

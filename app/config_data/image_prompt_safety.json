@@ -1,0 +1,471 @@
+{
+  "version": 1,
+  "reviewed_source_count": 50,
+  "last_updated": "2026-04-21",
+  "notes": "基于公开政策、平台帮助文档、研究论文与社区误判案例整理。该配置用于图像生成前的本地敏感词/违禁词清洗，不代表任何单一平台的完整官方敏感词表。",
+  "policy_categories": [
+    {
+      "key": "sexual_nudity",
+      "description": "裸露、色情、性行为、性化表达"
+    },
+    {
+      "key": "minors",
+      "description": "未成年人相关风险，包括性化、危险挑战、年龄不适宜内容"
+    },
+    {
+      "key": "violence_gore",
+      "description": "暴力、血腥、肢解、酷刑、极端伤害"
+    },
+    {
+      "key": "self_harm",
+      "description": "自杀、自残、饮食失调等自我伤害相关内容"
+    },
+    {
+      "key": "weapons_illicit",
+      "description": "武器、爆炸物、非法药物、违法活动"
+    },
+    {
+      "key": "hate_extremism",
+      "description": "仇恨、歧视、极端主义、恐怖主义"
+    },
+    {
+      "key": "deception_politics",
+      "description": "欺骗、冒充、政治操控、误导性内容"
+    },
+    {
+      "key": "privacy_ip_public_figure",
+      "description": "隐私信息、名人/公众人物、品牌/IP、第三方权利"
+    }
+  ],
+  "high_risk_terms_by_category": {
+    "sexual_nudity": [
+      "nude",
+      "nudity",
+      "naked",
+      "topless",
+      "bottomless",
+      "porn",
+      "pornography",
+      "erotic",
+      "fetish",
+      "sexy",
+      "seductive",
+      "sensual",
+      "provocative",
+      "lingerie"
+    ],
+    "minors": [
+      "child",
+      "children",
+      "kid",
+      "minor",
+      "underage",
+      "teen",
+      "teenager",
+      "schoolgirl",
+      "schoolboy"
+    ],
+    "violence_gore": [
+      "violence",
+      "violent",
+      "blood",
+      "bloody",
+      "gore",
+      "gory",
+      "mutilation",
+      "corpse",
+      "severed",
+      "torture",
+      "cannibalism"
+    ],
+    "self_harm": [
+      "suicide",
+      "self-harm",
+      "selfharm",
+      "cutting",
+      "anorexia",
+      "bulimia"
+    ],
+    "weapons_illicit": [
+      "weapon",
+      "weapons",
+      "gun",
+      "guns",
+      "rifle",
+      "pistol",
+      "knife",
+      "knives",
+      "blade",
+      "bomb",
+      "explosive",
+      "drug",
+      "drugs",
+      "cocaine",
+      "heroin",
+      "marijuana",
+      "weed",
+      "meth"
+    ],
+    "hate_extremism": [
+      "racist",
+      "racism",
+      "nazi",
+      "hitler",
+      "swastika",
+      "kkk",
+      "terrorist",
+      "terrorism",
+      "extremist",
+      "extremism"
+    ],
+    "deception_politics": [
+      "propaganda",
+      "misinformation",
+      "disinformation",
+      "fake",
+      "hoax",
+      "election",
+      "campaign",
+      "ballot"
+    ],
+    "privacy_ip_public_figure": [
+      "passport",
+      "credit card",
+      "social security",
+      "home address",
+      "celebrity",
+      "famous person",
+      "brand logo",
+      "trademark"
+    ]
+  },
+  "image_generation_phrase_rewrites": [
+    {
+      "pattern": "\\bwoman\\s+in\\s+red\\s+bikini\\b",
+      "replacement": "woman in red retro swimwear",
+      "reason": "降低服装场景中对泳装人体的性化表达"
+    },
+    {
+      "pattern": "\\bman\\s+in\\s+swim\\s+trunks\\b",
+      "replacement": "man in retro beachwear",
+      "reason": "降低人物着装词在部分平台的敏感误判"
+    },
+    {
+      "pattern": "\\bbikini\\b",
+      "replacement": "retro swimwear",
+      "reason": "保留设计语义，同时规避高频误判词"
+    },
+    {
+      "pattern": "\\bswimsuit\\b",
+      "replacement": "retro swimwear",
+      "reason": "服装设计语义保留，弱化敏感联想"
+    },
+    {
+      "pattern": "\\bbeach\\b",
+      "replacement": "coastal",
+      "reason": "在海滩+人物场景中降低敏感联想"
+    },
+    {
+      "pattern": "\\bsurfboard\\s+silhouettes?\\b",
+      "replacement": "board-shaped motifs",
+      "reason": "避免 silhouette 与人物/身体语义叠加"
+    },
+    {
+      "pattern": "\\bsilhouettes?\\b",
+      "replacement": "simplified shapes",
+      "reason": "弱化可能被误解的人体轮廓表达"
+    },
+    {
+      "pattern": "\\bcommercial\\s+apparel\\s+textile\\b",
+      "replacement": "apparel-safe textile design",
+      "reason": "统一改写为平台友好的商业服装描述"
+    },
+    {
+      "pattern": "\\bcommercial\\s+garment\\s+print\\b",
+      "replacement": "apparel-safe print graphic",
+      "reason": "统一改写为平台友好的成衣印花描述"
+    },
+    {
+      "pattern": "\\bpin-?up\\b",
+      "replacement": "retro poster-inspired",
+      "reason": "减少带有性化历史语境的词"
+    }
+  ],
+  "sources": [
+    {
+      "type": "official",
+      "title": "OpenAI Help Center - How we identify problematic content on our services for individuals",
+      "url": "https://help.openai.com/en/articles/8940831"
+    },
+    {
+      "type": "official",
+      "title": "OpenAI Usage Policies",
+      "url": "https://platform.openai.com/docs/usage-policies/safety-requirements"
+    },
+    {
+      "type": "official",
+      "title": "OpenAI - Creating content on Sora in line with our policies",
+      "url": "https://openai.com/policies/creating-images-and-videos-in-line-with-our-policies/"
+    },
+    {
+      "type": "official",
+      "title": "OpenAI - Combating online child sexual exploitation & abuse",
+      "url": "https://openai.com/index/combating-online-child-sexual-exploitation-abuse/"
+    },
+    {
+      "type": "official",
+      "title": "OpenAI - UK Online Safety Act",
+      "url": "https://openai.com/policies/uk-online-safety-act/"
+    },
+    {
+      "type": "official",
+      "title": "OpenAI - Australian Online Safety Act",
+      "url": "https://openai.com/policies/au-online-safety-act/"
+    },
+    {
+      "type": "official",
+      "title": "OpenAI - Addendum to GPT-4o System Card: Native image generation",
+      "url": "https://cdn.openai.com/11998be9-5319-4302-bfbf-1167e093f1fb/Native_Image_Generation_System_Card.pdf"
+    },
+    {
+      "type": "official",
+      "title": "OpenAI - Sora 2 System Card",
+      "url": "https://cdn.openai.com/pdf/50d5973c-c4ff-4c2d-986f-c72b5d0ff069/sora_2_system_card.pdf"
+    },
+    {
+      "type": "official",
+      "title": "Google Cloud - Responsible AI and usage guidelines for Imagen",
+      "url": "https://docs.cloud.google.com/vertex-ai/generative-ai/docs/image/responsible-ai-imagen"
+    },
+    {
+      "type": "official",
+      "title": "Google Cloud - Generative AI Prohibited Use Policy",
+      "url": "https://policies.google.com/terms/generative-ai/use-policy"
+    },
+    {
+      "type": "official",
+      "title": "Stability AI - Acceptable Use Policy",
+      "url": "https://stability.ai/use-policy"
+    },
+    {
+      "type": "official",
+      "title": "Midjourney - Community Guidelines",
+      "url": "https://docs.midjourney.com/hc/en-us/articles/32013696484109-Community-Guidelines"
+    },
+    {
+      "type": "official",
+      "title": "Leonardo AI - Guide to Handling Not Safe for Work Image Generation (NSFW)",
+      "url": "https://docs.leonardo.ai/docs/guide-to-handling-not-safe-for-work-image-generation-nsfw"
+    },
+    {
+      "type": "official",
+      "title": "Adobe Firefly - Known limitations in Firefly",
+      "url": "https://helpx.adobe.com/firefly/troubleshoot/known-limitations-in-firefly.html"
+    },
+    {
+      "type": "official",
+      "title": "Adobe Firefly - Writing effective text prompts",
+      "url": "https://helpx.adobe.com/firefly/web/generate-images-with-text-to-image/generate-images-using-text-prompts/writing-effective-text-prompts.html"
+    },
+    {
+      "type": "official",
+      "title": "Adobe Firefly - Enhance prompts to generate images",
+      "url": "https://helpx.adobe.com/si/firefly/generate-images-with-text-to-image/generate-images-using-text-prompts/enhance-prompts-to-generate-images.html"
+    },
+    {
+      "type": "official",
+      "title": "Blaze - Image Generation Guidelines & Restrictions",
+      "url": "https://help.blaze.ai/en/articles/14433618-image-generation-guidelines-restrictions"
+    },
+    {
+      "type": "official",
+      "title": "Fotor Help Center - Why is the AI generated image not approved?",
+      "url": "https://support.fotor.com/hc/en-us/articles/17764598361369-Why-is-the-AI-generated-image-not-approved-What-are-the-offensive-words-Does-it-consume-credit"
+    },
+    {
+      "type": "official",
+      "title": "10b.ai - Content Moderation Policy",
+      "url": "https://10b.ai/content-moderation-policy"
+    },
+    {
+      "type": "official",
+      "title": "ImaginingAI - Content Policy",
+      "url": "https://imaginingai.net/content-policy/"
+    },
+    {
+      "type": "official",
+      "title": "ZMO IMGCreator - Content Policy",
+      "url": "https://www.zmo.ai/imgcreator/helper/content-policy"
+    },
+    {
+      "type": "official",
+      "title": "Z-Image - 内容审核政策",
+      "url": "https://z-image.ai/zh/content-moderation-policy"
+    },
+    {
+      "type": "official",
+      "title": "Creator Alliance Group - Generative AI Usage Responsible Use Policy",
+      "url": "https://www.creatoralliancegroup.com/generative-ai-usage-responsible-use-policy"
+    },
+    {
+      "type": "official",
+      "title": "Creator Alliance Group - User Safety / Content Moderation Policy",
+      "url": "https://www.creatoralliancegroup.com/user-safety-content-moderation-policy"
+    },
+    {
+      "type": "official",
+      "title": "AI Photo Generator - Community Guidelines",
+      "url": "https://www.aiphotogenerator.com/community-guidelines/"
+    },
+    {
+      "type": "research",
+      "title": "PromptGuard: Soft Prompt-Guided Unsafe Content Moderation for Text-to-Image Models",
+      "url": "https://arxiv.org/abs/2501.03544"
+    },
+    {
+      "type": "research",
+      "title": "SneakyPrompt: Jailbreaking Text-to-image Generative Models",
+      "url": "https://arxiv.org/abs/2305.12082"
+    },
+    {
+      "type": "research",
+      "title": "SafeGen: Mitigating Sexually Explicit Content Generation in Text-to-Image Models",
+      "url": "https://arxiv.org/abs/2404.06666"
+    },
+    {
+      "type": "research",
+      "title": "PurifyGen: A Risk-Discrimination and Semantic-Purification Model for Safe Text-to-Image Generation",
+      "url": "https://arxiv.org/abs/2512.23546"
+    },
+    {
+      "type": "research",
+      "title": "Recent progress of the security research for multimodal large models",
+      "url": "https://www.cjig.cn/rc-pub/front/front-article/download/99641073/lowqualitypdf/Recent%20progress%20of%20the%20security%20research%20for%20multimodal%20large%20models.pdf"
+    },
+    {
+      "type": "research",
+      "title": "AIGC视觉内容生成与溯源研究进展",
+      "url": "https://cjig.cn/rc-pub/front/front-article/download/61781470/lowqualitypdf/AIGC%E8%A7%86%E8%A7%89%E5%86%85%E5%AE%B9%E7%94%9F%E6%88%90%E4%B8%8E%E6%BA%AF%E6%BA%90%E7%A0%94%E7%A9%B6%E8%BF%9B%E5%B1%95.pdf"
+    },
+    {
+      "type": "regulation",
+      "title": "Interim Measures for the Management of Generative AI Services",
+      "url": "https://en.wikipedia.org/wiki/Interim_Measures_for_the_Management_of_Generative_AI_Services"
+    },
+    {
+      "type": "news",
+      "title": "CNBC - Microsoft blocks terms that cause its AI to create violent images",
+      "url": "https://www.cnbc.com/2024/03/08/microsoft-blocking-terms-that-cause-its-ai-to-create-violent-images.html"
+    },
+    {
+      "type": "news",
+      "title": "AP - Microsoft engineer sounds alarm on AI image-generator",
+      "url": "https://apnews.com/article/b494180daaeb60fecfcfaead6cb00e13"
+    },
+    {
+      "type": "news",
+      "title": "AP - Midjourney blocks images of Biden and Trump",
+      "url": "https://apnews.com/article/bc6c254ddb20e36c5e750b4570889ce1"
+    },
+    {
+      "type": "news",
+      "title": "Baker McKenzie - Germany authority banned GenAI text-to-picture tool",
+      "url": "https://www.bakermckenzie.com/en/insight/publications/2026/03/germany-authority-banned-genai-text-to-picture-tool"
+    },
+    {
+      "type": "community",
+      "title": "Reddit - blocked or denied image generation after previously accepted prompts",
+      "url": "https://www.reddit.com/r/OpenAI/comments/1lwqnmm"
+    },
+    {
+      "type": "community",
+      "title": "Reddit - chatgpt censors prompts saying against policy",
+      "url": "https://www.reddit.com/r/ChatGPT/comments/1kh50ve"
+    },
+    {
+      "type": "community",
+      "title": "Reddit - Bing prompt blocking complaints",
+      "url": "https://www.reddit.com/r/bing/comments/171z3sb"
+    },
+    {
+      "type": "community",
+      "title": "Reddit - False unsafe image content detected",
+      "url": "https://www.reddit.com/r/aiArt/comments/1ak28n1"
+    },
+    {
+      "type": "community",
+      "title": "Reddit - Bing Image Creator blocking unexpected words",
+      "url": "https://www.reddit.com/r/bing/comments/18houx1"
+    },
+    {
+      "type": "community",
+      "title": "Reddit - Image Creator flagging all prompts as unsafe",
+      "url": "https://www.reddit.com/r/bing/comments/18ds1ye"
+    },
+    {
+      "type": "community",
+      "title": "Reddit - Leonardo failed generation did not meet content safety guidelines",
+      "url": "https://www.reddit.com/r/leonardoai/comments/1r3htqd/everything_using_a_starting_image_is_a_failed/"
+    },
+    {
+      "type": "community",
+      "title": "Reddit - content policy roulette in image generation",
+      "url": "https://www.reddit.com/r/OpenAI/comments/1jqdn2b"
+    },
+    {
+      "type": "community",
+      "title": "Reddit - Midjourney image denied for acceptable images",
+      "url": "https://www.reddit.com/r/midjourney/comments/1g8je0e"
+    },
+    {
+      "type": "community",
+      "title": "Reddit - Replika image generator banning more words",
+      "url": "https://www.reddit.com/r/replika/comments/174u80k"
+    },
+    {
+      "type": "community",
+      "title": "Reddit - ChatGPT image generation content policy complaints",
+      "url": "https://www.reddit.com/r/ChatGPT/comments/1jn4irh"
+    },
+    {
+      "type": "vendor_misc",
+      "title": "Leonardo - prompt appears contain inappropriate content",
+      "url": "https://app.leonardo.ai/generation/image/prompt-appears-contain-inappropriate-content-25acd1b6-97db-4186-aead-416bbad5f02e"
+    },
+    {
+      "type": "vendor_misc",
+      "title": "Adobe Firefly FAQ",
+      "url": "https://helpx.adobe.com/firefly/get-set-up/learn-the-basics/adobe-firefly-faq.pdf"
+    },
+    {
+      "type": "vendor_misc",
+      "title": "Adobe Firefly support hub",
+      "url": "https://helpx.adobe.com/support/firefly.html"
+    },
+    {
+      "type": "vendor_misc",
+      "title": "Adobe Firefly - Set content type",
+      "url": "https://helpx.adobe.com/firefly/generate-images-with-text-to-image/customize-generated-images/set-content-type.html"
+    },
+    {
+      "type": "vendor_misc",
+      "title": "Adobe Firefly - Replace background",
+      "url": "https://helpx.adobe.com/firefly/edit-images/transform-images-using-generative-fill/replace-background.pdf"
+    },
+    {
+      "type": "vendor_misc",
+      "title": "Leonardo Imagination Fund – Content Guidelines/T&Cs",
+      "url": "https://leonardo.ai/wp-content/uploads/2025/09/leonardo-imagination-fund_content-guidelines_tcs.pdf"
+    },
+    {
+      "type": "compliance_context",
+      "title": "OpenAI DSA Transparency Report",
+      "url": "https://cdn.openai.com/trust-and-transparency/dsa-2024-qualitative.pdf"
+    },
+    {
+      "type": "compliance_context",
+      "title": "OpenAI - Keeping Users Safe in the Age of AI",
+      "url": "https://cdn.openai.com/global-affairs/keeping-users-safe-in-the-age-of-ai-oct25.pdf"
+    }
+  ]
+}

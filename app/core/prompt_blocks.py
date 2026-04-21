@@ -22,21 +22,20 @@ TEXTURE_NEGATIVE_EN = (
 
 HERO_NEGATIVE_EN = (
     "text, labels, captions, titles, typography, words, letters, signage, logo, watermark, "
-    "plain light box, colored background box, filled rectangle, background art, scenery, landscape, environment, "
-    "checkerboard transparency preview, fake transparency grid, semi-transparent full-image patch, "
-    "gradient wash fade to transparent, colored fringe on edge, halo effect around subject, "
+    "colored background, tinted backdrop, gradient background, plain light box, colored background box, filled rectangle, "
+    "background art, scenery, landscape, environment, ground plane, floor, border, frame, extra objects, "
+    "drop shadow, contact shadow, cast shadow, halo effect around subject, "
     "full illustration scene, poster composition, sticker sheet, garment mockup, fashion model, mannequin, "
-    "person wearing garment, product photo, lookbook, ground shadow, vignette, "
+    "person wearing garment, product photo, lookbook, vignette, "
     "botanical backdrop, foliage behind subject, painted wash behind subject, garden background, meadow background, "
     "blurry, out of focus, smeared, smudged, distorted, deformed, low quality, jpeg artifacts, grainy"
 )
 
 PANEL_DEFAULTS_EN = {
-    "hero_motif_1": "foreground hero motif only, centered complete subject, transparent PNG cutout, real alpha background, preserve and recreate the primary subject from the user's reference image as much as possible, keep the recognizable silhouette, color identity, pose, proportions, and key visual details, full head and hair visible, uncropped subject, generous transparent margin above and around the subject, no background, no checkerboard transparency preview, no background art, no scenery, no garden, no foliage behind subject, no botanical backdrop, no painted wash, no rectangular composition, no full illustration scene, no vignette, no ground shadow, no text",
+    "hero_motif_1": "foreground hero motif only, centered complete subject, preserve and recreate the primary subject from the user's reference image as much as possible, keep the recognizable silhouette, color identity, pose, proportions, and key visual details, full head and hair visible, full uncropped figure, pure white background, no shadow, no floor, no scenery, no background art, no extra objects, clean crisp edges, apparel placement graphic, commercial garment print, no text",
     "texture_1": "seamless tileable visible repeat pattern with concrete small botanical or geometric motifs on pale ground, stable low-to-medium density, clearly repeatable elements, commercial apparel base fabric, no abstract wash, no plain texture, no paper grain only, no gradient, no empty background, no tonal atmosphere only, no blurred background, no scene, no landscape, no text",
     "texture_2": "seamless tileable coordinating visible repeat pattern with concrete small motifs, lattice, linework, leaves, dots, or controlled geometric elements, stable repeat structure on light ground, same palette, no abstract wash, no plain texture, no paper grain only, no gradient, no empty background, no tonal atmosphere only, no scene, no text",
     "texture_3": "tiny scattered small-scale pattern on light ground, controlled density, no text"
 }
-
 
 

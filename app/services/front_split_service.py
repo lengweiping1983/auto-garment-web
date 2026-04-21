@@ -1,24 +1,26 @@
-"""Create front-left/front-right motif assets from the primary theme image.
-
-Ported from scripts/theme_front_splitter.py — ALL logic preserved.
-"""
+"""Create front-left/front-right motif assets from the primary white-background image."""
 import json
 from collections import deque
 from pathlib import Path
 
-from PIL import Image, ImageFilter, ImageStat
+from PIL import Image, ImageChops, ImageFilter, ImageOps
 
 
-def _has_meaningful_alpha(rgba: Image.Image) -> bool:
-    alpha = rgba.getchannel("A")
-    extrema = alpha.getextrema()
-    if extrema[0] < 245:
-        bbox = alpha.getbbox()
-        if not bbox:
-            return False
-        area = (bbox[2] - bbox[0]) * (bbox[3] - bbox[1])
-        return area < rgba.width * rgba.height * 0.995
-    return False
+WHITE_MIN = 235
+WHITE_SPREAD_MAX = 18
+WHITE_DISTANCE_MAX = 42
+MIN_SUBJECT_AREA_RATIO = 0.03
+
+
+def _is_white_background_pixel(pixel: tuple[int, int, int], palette: list[tuple[int, int, int]]) -> bool:
+    r, g, b = pixel
+    if min(pixel) < WHITE_MIN:
+        return False
+    if max(pixel) - min(pixel) > WHITE_SPREAD_MAX:
+        return False
+    if not palette:
+        return True
+    return any(abs(r - pr) + abs(g - pg) + abs(b - pb) <= WHITE_DISTANCE_MAX for pr, pg, pb in palette)
 
 
 def _edge_pixels(rgb: Image.Image) -> list[tuple[int, int, int]]:
@@ -35,52 +37,25 @@ def _edge_pixels(rgb: Image.Image) -> list[tuple[int, int, int]]:
     return out
 
 
-def _is_background_like(color: tuple[int, int, int]) -> bool:
-    r, g, b = color
-    spread = max(color) - min(color)
-    avg = (r + g + b) / 3
-    return spread <= 42 or avg >= 232
-
-
-def _quantize(color: tuple[int, int, int], step: int = 16) -> tuple[int, int, int]:
-    return tuple(max(0, min(255, round(v / step) * step)) for v in color)
-
-
 def _edge_background_palette(rgb: Image.Image) -> list[tuple[int, int, int]]:
-    samples = [c for c in _edge_pixels(rgb) if _is_background_like(c)]
+    samples = [c for c in _edge_pixels(rgb) if min(c) >= WHITE_MIN and max(c) - min(c) <= WHITE_SPREAD_MAX]
     if not samples:
         return []
     counts: dict[tuple[int, int, int], int] = {}
-    for color in samples:
-        key = _quantize(color)
-        counts[key] = counts.get(key, 0) + 1
+    for sample in samples:
+        bucket = tuple(round(v / 8) * 8 for v in sample)
+        counts[bucket] = counts.get(bucket, 0) + 1
     ranked = sorted(counts.items(), key=lambda item: item[1], reverse=True)
-    edge_count = max(1, len(_edge_pixels(rgb)))
-    palette = [color for color, count in ranked[:6] if count / edge_count >= 0.015]
-    return palette
+    total = max(1, len(samples))
+    return [color for color, count in ranked[:6] if count / total >= 0.03]
 
 
-def _remove_false_transparency_background(img: Image.Image) -> Image.Image:
-    """Turn common AI fake-transparent checker/flat edge backgrounds into real alpha."""
-    rgba = img.convert("RGBA")
-    if _has_meaningful_alpha(rgba):
-        return rgba
-    rgb = rgba.convert("RGB")
+def _extract_white_background_mask(rgb: Image.Image) -> Image.Image:
+    w, h = rgb.size
     palette = _edge_background_palette(rgb)
-    if not palette:
-        return rgba
-    src = rgba.load()
-    alpha = Image.new("L", rgba.size, 255)
-    alpha_px = alpha.load()
-    threshold = 54
-    w, h = rgba.size
-
-    def is_removable_bg(x: int, y: int) -> bool:
-        r, g, b, _ = src[x, y]
-        if not _is_background_like((r, g, b)):
-            return False
-        return any(abs(r - bg[0]) + abs(g - bg[1]) + abs(b - bg[2]) <= threshold for bg in palette)
-
+    pixels = rgb.load()
+    mask = Image.new("L", (w, h), 0)
+    mask_px = mask.load()
     queue: deque[int] = deque()
     seen = bytearray(w * h)
     for x in range(w):
@@ -89,7 +64,6 @@ def _remove_false_transparency_background(img: Image.Image) -> Image.Image:
     for y in range(h):
         queue.append(y * w)
         queue.append(y * w + (w - 1))
-
     while queue:
         idx = queue.popleft()
         if idx < 0 or idx >= len(seen) or seen[idx]:
@@ -97,9 +71,9 @@ def _remove_false_transparency_background(img: Image.Image) -> Image.Image:
         seen[idx] = 1
         x = idx % w
         y = idx // w
-        if not is_removable_bg(x, y):
+        if not _is_white_background_pixel(pixels[x, y], palette):
             continue
-        alpha_px[x, y] = 0
+        mask_px[x, y] = 255
         if x > 0:
             queue.append(idx - 1)
         if x + 1 < w:
@@ -108,59 +82,93 @@ def _remove_false_transparency_background(img: Image.Image) -> Image.Image:
             queue.append(idx - w)
         if y + 1 < h:
             queue.append(idx + w)
-    alpha = alpha.filter(ImageFilter.GaussianBlur(0.45))
-    rgba.putalpha(alpha)
-    return rgba
+    return mask
 
 
-def _background_sample(img: Image.Image) -> tuple[int, int, int]:
+def _foreground_mask_from_white_bg(img: Image.Image) -> Image.Image:
     rgb = img.convert("RGB")
-    w, h = rgb.size
-    sample = Image.new("RGB", (1, 1))
-    pts = [
-        rgb.crop((0, 0, max(1, w // 8), max(1, h // 8))),
-        rgb.crop((max(0, w - w // 8), 0, w, max(1, h // 8))),
-        rgb.crop((0, max(0, h - h // 8), max(1, w // 8), h)),
-        rgb.crop((max(0, w - w // 8), max(0, h - h // 8), w, h)),
-    ]
-    colors = []
-    for crop in pts:
-        stat = ImageStat.Stat(crop)
-        colors.append(tuple(round(v) for v in stat.mean[:3]))
-    sample.putpixel((0, 0), tuple(round(sum(c[i] for c in colors) / len(colors)) for i in range(3)))
-    return sample.getpixel((0, 0))
+    bg_mask = _extract_white_background_mask(rgb)
+    subject = ImageOps.invert(bg_mask)
+    subject = subject.filter(ImageFilter.MedianFilter(size=3))
+    subject = subject.point(lambda value: 255 if value >= 14 else 0)
+    subject = subject.filter(ImageFilter.MaxFilter(size=3))
+    subject = subject.filter(ImageFilter.MinFilter(size=3))
+    return subject
 
 
-def _subject_bbox(img: Image.Image) -> tuple[int, int, int, int] | None:
-    rgba = img.convert("RGBA")
-    alpha_bbox = rgba.getchannel("A").getbbox()
-    if alpha_bbox:
-        return alpha_bbox
-    bg = _background_sample(rgba)
-    rgb = rgba.convert("RGB")
-    w, h = rgb.size
+def _alpha_bbox(alpha: Image.Image) -> tuple[int, int, int, int] | None:
+    bbox = alpha.getbbox()
+    if not bbox:
+        return None
+    area = (bbox[2] - bbox[0]) * (bbox[3] - bbox[1])
+    if area <= 0:
+        return None
+    return bbox
+
+
+def _coarse_bbox_from_background_diff(img: Image.Image) -> tuple[int, int, int, int] | None:
+    rgb = img.convert("RGB")
+    bg = _edge_background_palette(rgb)
+    if not bg:
+        bg = [(248, 248, 248)]
     pixels = rgb.load()
+    w, h = rgb.size
     xs, ys = [], []
-    threshold = 42
     for y in range(h):
         for x in range(w):
-            r, g, b = pixels[x, y]
-            if abs(r - bg[0]) + abs(g - bg[1]) + abs(b - bg[2]) > threshold:
+            if not _is_white_background_pixel(pixels[x, y], bg):
                 xs.append(x)
                 ys.append(y)
     if not xs:
         return None
     bbox = (min(xs), min(ys), max(xs) + 1, max(ys) + 1)
     area = (bbox[2] - bbox[0]) * (bbox[3] - bbox[1])
-    if area < w * h * 0.03:
+    if area < w * h * MIN_SUBJECT_AREA_RATIO:
         return None
     return bbox
 
 
-def _crop_subject(img: Image.Image) -> Image.Image:
-    rgba = _remove_false_transparency_background(img)
+def _build_soft_subject_rgba(img: Image.Image) -> tuple[Image.Image, Image.Image, Image.Image]:
+    rgba = img.convert("RGBA")
+    coarse_mask = _foreground_mask_from_white_bg(rgba)
+    bbox = _alpha_bbox(coarse_mask)
+    if not bbox:
+        bbox = _coarse_bbox_from_background_diff(rgba)
+    if not bbox:
+        fallback = Image.new("L", rgba.size, 255)
+        return rgba, fallback, Image.new("RGBA", rgba.size, (255, 255, 255, 0))
+
+    area = (bbox[2] - bbox[0]) * (bbox[3] - bbox[1])
+    if area < rgba.width * rgba.height * MIN_SUBJECT_AREA_RATIO:
+        fallback_bbox = _coarse_bbox_from_background_diff(rgba)
+        if fallback_bbox:
+            bbox = fallback_bbox
+
+    hard_mask = coarse_mask.point(lambda value: 255 if value >= 20 else 0)
+    alpha = hard_mask.filter(ImageFilter.GaussianBlur(radius=1.35))
+    alpha = ImageChops.lighter(alpha, hard_mask)
+    alpha = alpha.point(lambda value: 0 if value <= 8 else min(255, int(value * 1.08)))
+
+    bbox = _alpha_bbox(alpha)
+    if not bbox:
+        bbox = _coarse_bbox_from_background_diff(rgba)
+        if not bbox:
+            fallback = Image.new("L", rgba.size, 255)
+            return rgba, fallback, Image.new("RGBA", rgba.size, (255, 255, 255, 0))
+        alpha = Image.new("L", rgba.size, 0)
+        alpha.paste(255, bbox)
+
+    out = rgba.copy()
+    out.putalpha(alpha)
+    overlay = Image.new("RGBA", rgba.size, (255, 255, 255, 0))
+    overlay.paste((255, 0, 0, 96), mask=hard_mask)
+    return out, alpha, overlay
+
+
+def _crop_subject(img: Image.Image) -> tuple[Image.Image, Image.Image, Image.Image]:
+    rgba, alpha, overlay = _build_soft_subject_rgba(img)
     w, h = rgba.size
-    bbox = _subject_bbox(rgba)
+    bbox = _alpha_bbox(alpha)
     if not bbox:
         side_w = round(w * 0.82)
         side_h = round(h * 0.82)
@@ -180,9 +188,13 @@ def _crop_subject(img: Image.Image) -> Image.Image:
     margin_x = max(6, round(cropped.width * 0.035))
     margin_top = max(12, round(cropped.height * 0.08))
     margin_bottom = max(8, round(cropped.height * 0.04))
-    out = Image.new("RGBA", (cropped.width + margin_x * 2, cropped.height + margin_top + margin_bottom), (0, 0, 0, 0))
+    out = Image.new(
+        "RGBA",
+        (cropped.width + margin_x * 2, cropped.height + margin_top + margin_bottom),
+        (0, 0, 0, 0),
+    )
     out.alpha_composite(cropped, (margin_x, margin_top))
-    return out
+    return out, alpha, overlay
 
 
 def _crop_half_to_seam_alpha(half: Image.Image, seam_side: str) -> Image.Image:
@@ -213,9 +225,15 @@ def create_front_split_assets(theme_image: str | Path, out_dir: str | Path) -> d
     assets_dir = out_dir / "assets"
     assets_dir.mkdir(parents=True, exist_ok=True)
     with Image.open(theme_image) as src:
-        subject = _crop_subject(src)
+        subject, mask, overlay = _crop_subject(src)
+
     full_path = assets_dir / "theme_front_full.png"
+    mask_path = assets_dir / "theme_front_mask.png"
+    overlay_path = assets_dir / "theme_front_debug_overlay.png"
     subject.save(full_path)
+    mask.save(mask_path)
+    overlay.save(overlay_path)
+
     mid = max(1, subject.width // 2)
     overlap = min(8, max(2, round(subject.width * 0.01))) if subject.width > 4 else 0
     left = subject.crop((0, 0, min(subject.width, mid + overlap), subject.height))

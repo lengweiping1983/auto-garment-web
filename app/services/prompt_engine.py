@@ -33,41 +33,56 @@ TEXTURE_NEGATIVE_EN = (
 
 HERO_NEGATIVE_EN = (
     "text, labels, captions, titles, typography, words, letters, signage, logo, watermark, "
-    "plain light box, colored background box, filled rectangle, background art, scenery, landscape, environment, "
-    "checkerboard transparency preview, fake transparency grid, semi-transparent full-image patch, "
-    "gradient wash fade to transparent, colored fringe on edge, halo effect around subject, "
+    "colored background, tinted backdrop, gradient background, plain light box, colored background box, filled rectangle, "
+    "background art, scenery, landscape, environment, ground plane, floor, border, frame, extra objects, "
+    "drop shadow, contact shadow, cast shadow, halo effect around subject, "
     "full illustration scene, poster composition, sticker sheet, garment mockup, fashion model, mannequin, "
-    "person wearing garment, product photo, lookbook, ground shadow, vignette, "
+    "person wearing garment, product photo, lookbook, vignette, "
     "botanical backdrop, foliage behind subject, painted wash behind subject, garden background, meadow background, "
     "blurry, out of focus, smeared, smudged, distorted, deformed, low quality, jpeg artifacts, grainy"
 )
 
 
-def _ensure_transparent_hero(prompt: str) -> str:
-    """Fallback: force transparent-background constraints if LLM missed them."""
+def _ensure_white_background_hero(prompt: str) -> str:
+    """Fallback: force pure-white-background constraints if LLM missed them."""
     if not prompt:
         return prompt
-    lower = prompt.lower()
-    # Check if already contains key transparency markers
-    has_transparent = "transparent" in lower
-    has_alpha = "alpha background" in lower or "real alpha" in lower
-    has_isolated = "isolated" in lower
-    has_no_bg = "no background" in lower
-    if has_transparent and has_alpha and has_isolated and has_no_bg:
-        return prompt
-    # LLM missed some — append mandatory transparency suffix
-    suffix = (
-        "isolated foreground motif only, transparent PNG cutout, real alpha background, "
-        "no background, no checkerboard transparency preview, no fake transparency grid, "
-        "no colored rectangle, no plain light box"
-    )
-    # Remove any existing conflicting phrases first
+    replacements = {
+        "transparent png cutout": "pure white background",
+        "transparent background": "pure white background",
+        "transparent alpha background": "pure white background",
+        "alpha background": "pure white background",
+        "real alpha background": "pure white background",
+        "transparent margin": "clean white margin",
+        "background removal": "pure white background",
+        "checkerboard transparency preview": "pure white background",
+        "fake transparency grid": "pure white background",
+        "no background": "pure white background",
+        "cutout": "clean edges",
+    }
+    cleaned = prompt
+    for bad, good in replacements.items():
+        cleaned = cleaned.replace(bad, good)
+        cleaned = cleaned.replace(bad.title(), good)
+        cleaned = cleaned.replace(bad.upper(), good.upper())
     for bad in (
-        "plain light background", "plain warm background", "removable plain background",
-        "removable plain backgrounds", "suitable for background removal",
+        "plain light background",
+        "plain warm background",
+        "removable plain background",
+        "removable plain backgrounds",
+        "suitable for background removal",
+        "transparent",
+        "alpha",
     ):
-        prompt = prompt.replace(bad, "transparent alpha background")
-    return f"{prompt}, {suffix}"
+        cleaned = cleaned.replace(bad, "pure white background")
+    lower = cleaned.lower()
+    if "pure white background" in lower and "no shadow" in lower and "clean" in lower and "edge" in lower:
+        return cleaned
+    suffix = (
+        "isolated foreground subject only, pure white background, no shadow, "
+        "no floor, no scenery, no extra objects, clean crisp edges, full uncropped figure"
+    )
+    return f"{cleaned}, {suffix}"
 
 def generate_texture_prompts(visual: dict, out_dir: Path) -> tuple[dict[str, str], dict]:
     """Build texture prompts from LLM-generated visual elements."""
@@ -78,7 +93,7 @@ def generate_texture_prompts(visual: dict, out_dir: Path) -> tuple[dict[str, str
 
     # Map texture_id → (purpose, panel, role, negative)
     meta = {
-        "hero_motif_1": ("AI生成主图透明定位图案",   "single_hero", "hero_motif_1", HERO_NEGATIVE_EN),
+        "hero_motif_1": ("AI生成主图白底定位图案",   "single_hero", "hero_motif_1", HERO_NEGATIVE_EN),
         "texture_1":    ("纹理1",                  "single_texture", "base_texture",   TEXTURE_NEGATIVE_EN),
         "texture_2":    ("纹理2",                  "single_texture", "base_texture",   TEXTURE_NEGATIVE_EN),
         "texture_3":    ("纹理3",                  "single_texture", "base_texture",   TEXTURE_NEGATIVE_EN),
@@ -93,9 +108,9 @@ def generate_texture_prompts(visual: dict, out_dir: Path) -> tuple[dict[str, str
         if not raw:
             print(f"[WARN] LLM did not return prompt for {tid}, using empty string")
 
-        # 2. Program fallback: ensure hero has transparent background
+        # 2. Program fallback: ensure hero has pure white background
         if tid == "hero_motif_1":
-            raw = _ensure_transparent_hero(raw)
+            raw = _ensure_white_background_hero(raw)
 
         # 3. Sanitize: stop-words, banned words, blur risks
         cleaned = sanitize_prompt(raw, domain="fashion")

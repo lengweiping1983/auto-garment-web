@@ -180,6 +180,19 @@ def _config_phrase_rewrites() -> tuple[tuple[str, str], ...]:
     return tuple(rewrites)
 
 
+def _config_high_risk_terms() -> tuple[str, ...]:
+    groups = IMAGE_PROMPT_SAFETY_CONFIG.get("high_risk_terms_by_category") or {}
+    terms: list[str] = []
+    for values in groups.values():
+        if not isinstance(values, list):
+            continue
+        for item in values:
+            if isinstance(item, str) and item.strip():
+                terms.append(item.strip().lower())
+    # Longest-first avoids partial replacements breaking multi-word phrases.
+    return tuple(sorted(set(terms), key=len, reverse=True))
+
+
 @dataclass
 class PromptSanitizationResult:
     original_text: str
@@ -400,7 +413,70 @@ def _clean_joined_text(text: str) -> str:
     text = re.sub(r"\s+([,.;:!?])", r"\1", text)
     text = re.sub(r"([,.;:!?]){2,}", r"\1", text)
     text = re.sub(r"\b(no|without)\s*,", r"\1", text, flags=re.IGNORECASE)
+    text = re.sub(r"(?:\b(?:no|without)\b\s*){2,}", "no ", text, flags=re.IGNORECASE)
+    text = re.sub(r"(?:,\s*){2,}", ", ", text)
     return text.strip(" ,;")
+
+
+def _strip_config_high_risk_terms(text: str, prompt_role: str = "positive") -> str:
+    """Remove or neutralize config-defined high-risk terms before image submission."""
+    if not text:
+        return text
+
+    out = text
+    for term in _config_high_risk_terms():
+        pattern = r"\b" + re.escape(term).replace(r"\ ", r"\s+") + r"\b"
+        if prompt_role == "negative":
+            # Negative prompts should avoid spelling out sensitive categories at all.
+            out = re.sub(
+                r"(?:\b(?:no|without)\b\s+)?" + pattern,
+                "",
+                out,
+                flags=re.IGNORECASE,
+            )
+        else:
+            out = re.sub(pattern, "", out, flags=re.IGNORECASE)
+
+    out = re.sub(r"\b(?:no|without)\b\s*(?=(?:,|;|\.|$))", "", out, flags=re.IGNORECASE)
+    return _clean_joined_text(out)
+
+
+def _dedupe_comma_chunks(text: str) -> str:
+    if not text:
+        return text
+    chunks = [chunk.strip() for chunk in re.split(r"\s*,\s*", text) if chunk.strip()]
+    seen: set[str] = set()
+    unique: list[str] = []
+    for chunk in chunks:
+        key = chunk.lower()
+        if key in seen:
+            continue
+        seen.add(key)
+        unique.append(chunk)
+    return ", ".join(unique)
+
+
+def sanitize_prompt_for_strict_image_safety(text: str, prompt_role: str = "positive") -> str:
+    """Stricter final pass used when image vendors reject prompts for sensitive wording."""
+    if not text or not isinstance(text, str):
+        return text
+
+    out = sanitize_prompt_for_image_generation(text, prompt_role=prompt_role)
+    out = _strip_config_high_risk_terms(out, prompt_role=prompt_role)
+
+    if prompt_role == "negative":
+        # Keep negative prompts focused on render quality and structural constraints,
+        # not on enumerating safety categories that moderation often flags.
+        keep_chunks = []
+        for chunk in re.split(r"\s*,\s*", out):
+            lowered = chunk.lower().strip()
+            if not lowered:
+                continue
+            if any(term in lowered for term in ("quality", "artifact", "blurr", "smear", "smudge", "grain", "distort", "deform", "watermark", "logo", "text", "letter", "typography", "caption", "title", "shadow", "wrinkle", "fold", "crease", "gradient", "scene", "landscape", "background")):
+                keep_chunks.append(chunk.strip())
+        out = ", ".join(dict.fromkeys(keep_chunks))
+
+    return _clean_joined_text(_dedupe_comma_chunks(out))
 
 
 def sanitize_prompt_with_report(text: str, domain: str = "generic", prompt_role: str = "positive") -> PromptSanitizationResult:

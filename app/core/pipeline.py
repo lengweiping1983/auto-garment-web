@@ -20,6 +20,7 @@ from pathlib import Path
 
 from app.config import settings
 from app.core.neo_ai_client import NeoAIClient
+from app.core.prompt_sanitizer import sanitize_prompt_for_strict_image_safety
 
 from PIL import Image
 from app.core.renderer import render_all, compose_preview
@@ -425,13 +426,25 @@ async def _gen_hero(
     })
     _update_detail_field(task_id, "hero_motif", {"status": "running"})
     try:
-        task_code = await neo.submit_generation(
-            prompt=prompt,
-            negative_prompt=negative_prompt,
-            model=model,
-            size=size,
-            reference_images=[ref_url] if ref_url else None,
-        )
+        try:
+            task_code = await neo.submit_generation(
+                prompt=prompt,
+                negative_prompt=negative_prompt,
+                model=model,
+                size=size,
+                reference_images=[ref_url] if ref_url else None,
+            )
+        except Exception as exc:
+            if not _is_prompt_safety_error(exc):
+                raise
+            print("[RETRY] Hero prompt hit moderation, retrying with stricter sanitization...")
+            task_code = await neo.submit_generation(
+                prompt=sanitize_prompt_for_strict_image_safety(prompt, prompt_role="positive"),
+                negative_prompt=sanitize_prompt_for_strict_image_safety(negative_prompt, prompt_role="negative"),
+                model=model,
+                size=size,
+                reference_images=[ref_url] if ref_url else None,
+            )
         return await neo.poll_until_complete(task_code, hero_dir)
     except Exception as exc:
         return exc
@@ -458,19 +471,50 @@ async def _gen_texture(
     work = texture_root / tid
     work.mkdir(parents=True, exist_ok=True)
     try:
-        task_code = await neo.submit_generation(
-            prompt=prompt,
-            negative_prompt=negative_prompt,
-            model=model,
-            size=size,
-            reference_images=[ref_url] if ref_url else None,
-        )
+        try:
+            task_code = await neo.submit_generation(
+                prompt=prompt,
+                negative_prompt=negative_prompt,
+                model=model,
+                size=size,
+                reference_images=[ref_url] if ref_url else None,
+            )
+        except Exception as exc:
+            if not _is_prompt_safety_error(exc):
+                raise
+            print(f"[RETRY] Texture {tid} prompt hit moderation, retrying with stricter sanitization...")
+            task_code = await neo.submit_generation(
+                prompt=sanitize_prompt_for_strict_image_safety(prompt, prompt_role="positive"),
+                negative_prompt=sanitize_prompt_for_strict_image_safety(negative_prompt, prompt_role="negative"),
+                model=model,
+                size=size,
+                reference_images=[ref_url] if ref_url else None,
+            )
         p = await neo.poll_until_complete(task_code, work)
         dest = texture_root / f"{tid}.png"
         shutil.copy2(p, dest)
         return dest
     except Exception as exc:
         return exc
+
+
+def _is_prompt_safety_error(exc: Exception) -> bool:
+    text = str(exc).lower()
+    markers = (
+        "敏感词",
+        "敏感",
+        "内容安全",
+        "审核",
+        "违规",
+        "违禁",
+        "unsafe",
+        "sensitive",
+        "inappropriate",
+        "content safety",
+        "moderation",
+        "nsfw",
+    )
+    return any(marker in text for marker in markers)
 
 
 async def _generate_variant_thumbnails(variant_dir: Path, task_dir: Path):

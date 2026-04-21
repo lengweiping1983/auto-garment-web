@@ -61,6 +61,7 @@ async def create_task(
             "user_prompt": user_prompt,
             "neo_model": neo_model,
             "neo_size": neo_size,
+            "hero_prompt_scheme": "b",
         }, ensure_ascii=False, indent=2),
         encoding="utf-8",
     )
@@ -74,6 +75,7 @@ async def create_task(
         user_prompt=user_prompt,
         neo_model=neo_model,
         neo_size=neo_size,
+        hero_prompt_scheme="b",
     )
 
     return TaskCreateResponse(
@@ -176,6 +178,7 @@ async def retry_task(
         user_prompt=user_prompt,
         neo_model=neo_model,
         neo_size=neo_size,
+        hero_prompt_scheme="b",
     )
 
     return {
@@ -263,6 +266,7 @@ async def continue_render(task_id: str, background_tasks: BackgroundTasks):
     user_prompt = config.get("user_prompt", "")
     neo_model = config.get("neo_model", "")
     neo_size = config.get("neo_size", "")
+    hero_prompt_scheme = config.get("hero_prompt_scheme", "b")
     dirty_assets = read_dirty_assets(task_id)
     target_texture_ids = list(texture_paths.keys())
 
@@ -292,6 +296,7 @@ async def continue_render(task_id: str, background_tasks: BackgroundTasks):
         user_prompt=user_prompt,
         neo_model=neo_model,
         neo_size=neo_size,
+        hero_prompt_scheme=hero_prompt_scheme,
         force_render=True,
         force_render_texture_ids=target_texture_ids,
         allow_missing_hero=True,

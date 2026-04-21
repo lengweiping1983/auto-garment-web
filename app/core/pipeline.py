@@ -28,6 +28,7 @@ from app.core.image_utils import generate_thumbnail, _thumb_size_for_role
 from app.services.front_split_service import create_front_split_assets, inject_front_split_motifs
 from app.services.fill_plan_service import build_fill_plan
 from app.services.prompt_engine import generate_texture_prompts, save_texture_prompts
+from app.services.hero_prompt_strategy_base import validate_hero_prompt_scheme
 from app.services.template_service import resolve_template
 from app.services.vision_service import VisionService
 
@@ -647,11 +648,13 @@ async def run_pipeline(
     user_prompt: str = "",
     neo_model: str = "",
     neo_size: str = "",
+    hero_prompt_scheme: str = "b",
     force_render: bool = False,
     force_render_texture_ids: list[str] | None = None,
     allow_missing_hero: bool = False,
 ):
     """Run the complete garment production pipeline with resume support and streaming variants."""
+    hero_prompt_scheme = validate_hero_prompt_scheme(hero_prompt_scheme)
     work_dir = settings.storage_base_dir / task_id
     work_dir.mkdir(parents=True, exist_ok=True)
     render_mode, render_runtime = _resolve_render_mode()
@@ -766,7 +769,12 @@ async def run_pipeline(
         else:
             _write_status(task_id, "analyzing", {"phase": "vision_analysis", "completed_steps": [], "current_step": "vision_analysis"})
             vision = VisionService()
-            visual = await vision.analyze_theme_image(theme_image_path, garment_type=garment_type, user_prompt=user_prompt)
+            visual = await vision.analyze_theme_image(
+                theme_image_path,
+                garment_type=garment_type,
+                user_prompt=user_prompt,
+                hero_prompt_scheme=hero_prompt_scheme,
+            )
             _write_json(work_dir / "visual_elements.json", visual)
 
         # Phase 2: Prompt generation
@@ -775,11 +783,11 @@ async def run_pipeline(
         if prompt_map:
             _write_status(task_id, "analyzing", {"phase": "prompt_generation", "completed_steps": ["vision_analysis"], "current_step": "prompt_generation (resumed)"})
             if not texture_prompts:
-                _, texture_prompts = generate_texture_prompts(visual, work_dir)
+                _, texture_prompts = generate_texture_prompts(visual, work_dir, hero_prompt_scheme=hero_prompt_scheme)
                 save_texture_prompts(texture_prompts, work_dir)
         else:
             _write_status(task_id, "analyzing", {"phase": "prompt_generation", "completed_steps": ["vision_analysis"], "current_step": "prompt_generation"})
-            prompt_map, texture_prompts = generate_texture_prompts(visual, work_dir)
+            prompt_map, texture_prompts = generate_texture_prompts(visual, work_dir, hero_prompt_scheme=hero_prompt_scheme)
             save_texture_prompts(texture_prompts, work_dir)
             prompt_dir = work_dir / "generated_texture_prompts"
             prompt_dir.mkdir(parents=True, exist_ok=True)

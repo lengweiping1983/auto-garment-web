@@ -133,6 +133,17 @@ def clear_rerender_outputs(task_id: str) -> None:
             path.unlink()
 
 
+def clear_front_split_assets(task_id: str) -> None:
+    work_dir = settings.storage_base_dir / task_id
+    assets_dir = work_dir / "assets"
+    if not assets_dir.exists():
+        return
+    for filename in ("theme_front_full.png", "theme_front_left.png", "theme_front_right.png"):
+        path = assets_dir / filename
+        if path.exists():
+            path.unlink()
+
+
 def read_dirty_assets(task_id: str) -> dict:
     path = _dirty_assets_path(task_id)
     if not path.exists():
@@ -757,7 +768,7 @@ async def run_pipeline(
         if not needs_hero and not needs_textures:
             print("[RESUME] All AI assets exist, skipping generation.")
             # Standard Phase 4-6
-            front_split_assets = _resume_front_split()
+            front_split_assets = _resume_front_split() if hero_path else {}
             if not _has_complete_front_split_assets(front_split_assets) and hero_path:
                 try:
                     front_split_assets = create_front_split_assets(hero_path, work_dir)

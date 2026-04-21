@@ -9,7 +9,7 @@ from fastapi import APIRouter, BackgroundTasks, File, Form, HTTPException, Uploa
 
 from app.config import settings
 from app.core.image_utils import resolve_theme_image
-from app.core.pipeline import clear_rerender_outputs, read_dirty_assets, read_task_status, run_pipeline
+from app.core.pipeline import clear_front_split_assets, clear_rerender_outputs, read_dirty_assets, read_task_status, run_pipeline
 from app.models.schemas import GarmentType, TaskCreateResponse, TaskStatusResponse
 
 router = APIRouter()
@@ -267,6 +267,8 @@ async def continue_render(task_id: str, background_tasks: BackgroundTasks):
     target_texture_ids = list(texture_paths.keys())
 
     clear_rerender_outputs(task_id)
+    if dirty_assets.get("hero") and not hero_path:
+        clear_front_split_assets(task_id)
 
     # Update status before starting
     from app.core.pipeline import _write_status

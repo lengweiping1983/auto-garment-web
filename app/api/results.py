@@ -206,6 +206,14 @@ async def delete_hero_motif(task_id: str):
             if f.is_file() and f.suffix.lower() in {".png", ".jpg", ".jpeg", ".webp"}:
                 f.unlink()
 
+    # Clear derived front-split assets so rerender cannot reuse stale hero-based motifs.
+    assets_dir = task_dir / "assets"
+    if assets_dir.exists():
+        for name in ("theme_front_full.png", "theme_front_left.png", "theme_front_right.png"):
+            path = assets_dir / name
+            if path.exists():
+                path.unlink()
+
     _update_detail_field(task_id, "hero_motif", {"status": "pending", "path": ""})
     mark_dirty_assets(task_id, hero=True)
     return {"ok": True, "deleted": True}

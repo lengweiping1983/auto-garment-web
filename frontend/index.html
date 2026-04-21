@@ -1117,7 +1117,12 @@
         <img id="lightboxImg" src="" alt="">
     </div>
 
+    <script src="config.js"></script>
     <script>
+        function apiUrl(path) {
+            return API_BASE + path;
+        }
+
         let currentTaskId = null;
         let selectedTaskId = null;
         let pollInterval = null;
@@ -1239,7 +1244,7 @@
 
         async function loadTasks() {
             try {
-                const res = await fetch('/api/v1/tasks');
+                const res = await fetch(apiUrl('/api/v1/tasks'));
                 const data = await res.json();
                 const listEl = document.getElementById('taskList');
                 const countEl = document.getElementById('taskCountBadge');
@@ -1295,7 +1300,7 @@
             updateWorkspaceHero(taskId, 'pending', '正在读取任务详情与主题图。右侧会切换到当前任务的完整上下文。');
 
             try {
-                const res = await fetch(`/api/v1/tasks/${taskId}`);
+                const res = await fetch(apiUrl(`/api/v1/tasks/${taskId}`));
                 const data = await res.json();
                 if (res.ok) {
                     document.getElementById('progressCard').classList.remove('hidden');
@@ -1343,7 +1348,7 @@
             form.append('neo_size', document.getElementById('neoSize').value);
 
             try {
-                const res = await fetch('/api/v1/tasks', { method: 'POST', body: form });
+                const res = await fetch(apiUrl('/api/v1/tasks'), { method: 'POST', body: form });
                 const data = await res.json();
                 if (!res.ok) throw new Error(data.detail || '提交失败');
                 currentTaskId = data.task_id;
@@ -1391,7 +1396,7 @@
             form.append('neo_size', document.getElementById('neoSize').value);
 
             try {
-                const res = await fetch(`/api/v1/tasks/${selectedTaskId}/retry`, { method: 'POST', body: form });
+                const res = await fetch(apiUrl(`/api/v1/tasks/${selectedTaskId}/retry`), { method: 'POST', body: form });
                 const data = await res.json();
                 if (!res.ok) throw new Error(data.detail || '提交失败');
                 currentTaskId = data.task_id;
@@ -1420,7 +1425,7 @@
         async function pollStatus() {
             if (!currentTaskId) return;
             try {
-                const res = await fetch(`/api/v1/tasks/${currentTaskId}`);
+                const res = await fetch(apiUrl(`/api/v1/tasks/${currentTaskId}`));
                 const data = await res.json();
                 updateProgress(data);
                 updateReferenceImages(currentTaskId, data.progress, data.status);
@@ -1568,9 +1573,9 @@
 
             let url = '';
             if (type === 'hero') {
-                url = `/api/v1/tasks/${currentTaskId}/hero_motif`;
+                url = apiUrl(`/api/v1/tasks/${currentTaskId}/hero_motif`);
             } else {
-                url = `/api/v1/tasks/${currentTaskId}/textures/${type}`;
+                url = apiUrl(`/api/v1/tasks/${currentTaskId}/textures/${type}`);
             }
 
             try {
@@ -1690,7 +1695,7 @@
             const themeImg = document.getElementById('refThemeImg');
             const themePlaceholder = document.getElementById('refThemePlaceholder');
             const themeImgWrap = themeImg ? themeImg.closest('.img-wrap') : null;
-            const themeUrl = `/api/v1/tasks/${taskId}/theme_image`;
+            const themeUrl = apiUrl(`/api/v1/tasks/${taskId}/theme_image`);
             if (themeImg) {
                 if (!themeImg.src || themeImg.src.split('?')[0] !== themeUrl) {
                     themeImg.onerror = function() {
@@ -1729,10 +1734,10 @@
                 themeStatusEl.className = 'ref-status ref-status-' + themeSt;
             }
 
-            updateReferenceImageItem('hero', detail.hero_motif, `/api/v1/tasks/${taskId}/hero_motif`, globalStatus);
-            updateReferenceImageItem('texture_1', detail.texture_1, `/api/v1/tasks/${taskId}/textures/texture_1`, globalStatus);
-            updateReferenceImageItem('texture_2', detail.texture_2, `/api/v1/tasks/${taskId}/textures/texture_2`, globalStatus);
-            updateReferenceImageItem('texture_3', detail.texture_3, `/api/v1/tasks/${taskId}/textures/texture_3`, globalStatus);
+            updateReferenceImageItem('hero', detail.hero_motif, apiUrl(`/api/v1/tasks/${taskId}/hero_motif`), globalStatus);
+            updateReferenceImageItem('texture_1', detail.texture_1, apiUrl(`/api/v1/tasks/${taskId}/textures/texture_1`), globalStatus);
+            updateReferenceImageItem('texture_2', detail.texture_2, apiUrl(`/api/v1/tasks/${taskId}/textures/texture_2`), globalStatus);
+            updateReferenceImageItem('texture_3', detail.texture_3, apiUrl(`/api/v1/tasks/${taskId}/textures/texture_3`), globalStatus);
             checkAllAssetsReady();
         }
 
@@ -1789,7 +1794,7 @@
             let defaultVariantId = '';
 
             try {
-                const res = await fetch(`/api/v1/tasks/${currentTaskId}/summary`);
+                const res = await fetch(apiUrl(`/api/v1/tasks/${currentTaskId}/summary`));
                 const summary = await res.json();
                 const variants = summary['裁片模板变体'] || [];
                 hasExportableResults = variants.length > 0;
@@ -1801,7 +1806,7 @@
                     const fpDiv = document.createElement('div');
                     fpDiv.className = 'preview-item';
                     fpDiv.innerHTML = `
-                        <img src="/api/v1/tasks/${currentTaskId}/front_pair_check?variant=${tid}&t=${Date.now()}" alt="预览${num} 对位检查" onerror="this.style.display='none'">
+                        <img src="${apiUrl(`/api/v1/tasks/${currentTaskId}/front_pair_check?variant=${tid}`)}&t=${Date.now()}" alt="预览${num} 对位检查" onerror="this.style.display='none'">
                         <h4>预览 ${num} · 对位检查</h4>
                     `;
                     previewGrid.appendChild(fpDiv);
@@ -1809,7 +1814,7 @@
                     const pwDiv = document.createElement('div');
                     pwDiv.className = 'preview-item';
                     pwDiv.innerHTML = `
-                        <img src="/api/v1/tasks/${currentTaskId}/preview_white?variant=${tid}&t=${Date.now()}" alt="预览${num} 白底预览" onerror="this.style.display='none'">
+                        <img src="${apiUrl(`/api/v1/tasks/${currentTaskId}/preview_white?variant=${tid}`)}&t=${Date.now()}" alt="预览${num} 白底预览" onerror="this.style.display='none'">
                         <h4>预览 ${num} · 白底预览</h4>
                     `;
                     previewGrid.appendChild(pwDiv);
@@ -1832,7 +1837,7 @@
                     const div = document.createElement('div');
                     div.className = 'piece-thumb';
                     div.innerHTML = `
-                        <img src="/api/v1/tasks/${currentTaskId}/pieces/${pid}?variant=${defaultVariantId}&t=${Date.now()}" alt="${pid}" onerror="this.parentElement.style.display='none'">
+                        <img src="${apiUrl(`/api/v1/tasks/${currentTaskId}/pieces/${pid}?variant=${defaultVariantId}`)}&t=${Date.now()}" alt="${pid}" onerror="this.parentElement.style.display='none'">
                     `;
                     piecesGrid.appendChild(div);
                 }
@@ -1887,11 +1892,11 @@
 
             let url;
             if (type === 'theme') {
-                url = `/api/v1/tasks/${currentTaskId}/theme_image`;
+                url = apiUrl(`/api/v1/tasks/${currentTaskId}/theme_image`);
             } else if (type === 'hero') {
-                url = `/api/v1/tasks/${currentTaskId}/hero_motif`;
+                url = apiUrl(`/api/v1/tasks/${currentTaskId}/hero_motif`);
             } else {
-                url = `/api/v1/tasks/${currentTaskId}/textures/${type}`;
+                url = apiUrl(`/api/v1/tasks/${currentTaskId}/textures/${type}`);
             }
 
             try {
@@ -1910,11 +1915,11 @@
                     placeholder.style.display = 'none';
                 };
                 if (type === 'theme') {
-                    img.src = `/api/v1/tasks/${currentTaskId}/theme_image?t=` + Date.now();
+                    img.src = apiUrl(`/api/v1/tasks/${currentTaskId}/theme_image`) + '?t=' + Date.now();
                 } else if (type === 'hero') {
-                    img.src = `/api/v1/tasks/${currentTaskId}/hero_motif?t=` + Date.now();
+                    img.src = apiUrl(`/api/v1/tasks/${currentTaskId}/hero_motif`) + '?t=' + Date.now();
                 } else {
-                    img.src = `/api/v1/tasks/${currentTaskId}/textures/${type}?t=` + Date.now();
+                    img.src = apiUrl(`/api/v1/tasks/${currentTaskId}/textures/${type}`) + '?t=' + Date.now();
                 }
                 placeholder.classList.remove('uploading');
                 statusEl.textContent = '已完成';
@@ -1966,7 +1971,7 @@
             manualRenderingUntil = Date.now() + 3000; // keep "渲染中..." for at least 3s
             showingResults = false; // allow showResults() to refresh after re-render
             try {
-                const res = await fetch(`/api/v1/tasks/${currentTaskId}/continue_render`, { method: 'POST' });
+                const res = await fetch(apiUrl(`/api/v1/tasks/${currentTaskId}/continue_render`), { method: 'POST' });
                 const data = await res.json();
                 if (!res.ok) throw new Error(data.detail || '渲染启动失败');
                 document.getElementById('progressCard').classList.remove('hidden');
@@ -2028,17 +2033,17 @@
 
         function downloadPngPackage() {
             if (!currentTaskId) return;
-            _triggerDownload(`/api/v1/tasks/${currentTaskId}/download/png`, `auto_garment_${currentTaskId}_png.zip`);
+            _triggerDownload(apiUrl(`/api/v1/tasks/${currentTaskId}/download/png`), `auto_garment_${currentTaskId}_png.zip`);
         }
 
         function downloadSvgPackage() {
             if (!currentTaskId) return;
-            _triggerDownload(`/api/v1/tasks/${currentTaskId}/download/svg`, `auto_garment_${currentTaskId}_svg.zip`);
+            _triggerDownload(apiUrl(`/api/v1/tasks/${currentTaskId}/download/svg`), `auto_garment_${currentTaskId}_svg.zip`);
         }
 
         function downloadResults() {
             if (!currentTaskId) return;
-            _triggerDownload(`/api/v1/tasks/${currentTaskId}/download`, `auto_garment_${currentTaskId}.zip`);
+            _triggerDownload(apiUrl(`/api/v1/tasks/${currentTaskId}/download`), `auto_garment_${currentTaskId}.zip`);
             document.body.removeChild(a);
         }
 
@@ -2047,7 +2052,7 @@
                 return;
             }
             try {
-                const res = await fetch(`/api/v1/tasks/${taskId}`, { method: 'DELETE' });
+                const res = await fetch(apiUrl(`/api/v1/tasks/${taskId}`), { method: 'DELETE' });
                 const data = await res.json();
                 if (!res.ok) throw new Error(data.detail || '删除失败');
                 if (selectedTaskId === taskId) {

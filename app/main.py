@@ -88,6 +88,11 @@ async def health_check():
 app.include_router(tasks.router, prefix="/api/v1", tags=["tasks"])
 app.include_router(results.router, prefix="/api/v1", tags=["results"])
 
+# Static storage directory for direct file access
+storage_dir = Path(__file__).resolve().parents[1] / "storage"
+if storage_dir.exists():
+    app.mount("/storage", StaticFiles(directory=str(storage_dir)), name="storage")
+
 # Static frontend
 frontend_dir = Path(__file__).resolve().parents[1] / "frontend"
 if frontend_dir.exists():

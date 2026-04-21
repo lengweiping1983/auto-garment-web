@@ -1505,11 +1505,13 @@
 
         function normalizeAssetErrorMessage(message) {
             if (!message) return '';
-            return String(message)
+            const normalized = String(message)
                 .replace(/^Neo AI generation failed:\s*/i, '')
                 .replace(/^Generation failed:\s*/i, '')
                 .replace(/^Neo AI status check failed:\s*/i, '')
                 .trim();
+            if (/^(none|null|undefined)$/i.test(normalized)) return '';
+            return normalized;
         }
 
         function isReferenceDeletable(type) {
@@ -1773,13 +1775,17 @@
                 ['纹理 2', detail.texture_2],
                 ['纹理 3', detail.texture_3],
             ]
-                .filter(([, info]) => info && info.status === 'failed' && info.error)
-                .map(([label, info]) => `${label}: ${normalizeAssetErrorMessage(info.error)}`);
+                .map(([label, info]) => [label, normalizeAssetErrorMessage(info && info.error)])
+                .filter(([, message]) => !!message)
+                .map(([label, message]) => `${label}: ${message}`);
 
             const errorTextEl = document.getElementById('errorText');
             if (assetErrors.length > 0) {
                 errorTextEl.classList.remove('hidden');
                 errorTextEl.textContent = assetErrors.join(' | ');
+            } else {
+                errorTextEl.classList.add('hidden');
+                errorTextEl.textContent = '';
             }
             checkAllAssetsReady();
         }

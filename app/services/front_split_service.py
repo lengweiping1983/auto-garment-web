@@ -10,6 +10,7 @@ WHITE_MIN = 235
 WHITE_SPREAD_MAX = 18
 WHITE_DISTANCE_MAX = 42
 MIN_SUBJECT_AREA_RATIO = 0.03
+MIN_INTERNAL_BG_AREA_RATIO = 0.00012
 
 
 def _is_white_background_pixel(pixel: tuple[int, int, int], palette: list[tuple[int, int, int]]) -> bool:
@@ -85,15 +86,90 @@ def _extract_white_background_mask(rgb: Image.Image) -> Image.Image:
     return mask
 
 
+def _fill_enclosed_white_holes(rgb: Image.Image, bg_mask: Image.Image) -> Image.Image:
+    """Promote enclosed white islands to background.
+
+    This catches white pockets trapped between subject parts, such as the area
+    between a hand-held prop and the body, that edge flood-fill cannot reach.
+    """
+    w, h = rgb.size
+    palette = _edge_background_palette(rgb)
+    pixels = rgb.load()
+    bg_px = bg_mask.load()
+    seen = bytearray(w * h)
+    min_area = max(24, round(w * h * MIN_INTERNAL_BG_AREA_RATIO))
+
+    for y in range(h):
+        for x in range(w):
+            idx = y * w + x
+            if seen[idx] or bg_px[x, y] > 0:
+                continue
+            if not _is_white_background_pixel(pixels[x, y], palette):
+                continue
+
+            queue: deque[tuple[int, int]] = deque([(x, y)])
+            component: list[tuple[int, int]] = []
+            touches_border = False
+
+            while queue:
+                cx, cy = queue.popleft()
+                cidx = cy * w + cx
+                if seen[cidx]:
+                    continue
+                seen[cidx] = 1
+                if bg_px[cx, cy] > 0:
+                    continue
+                if not _is_white_background_pixel(pixels[cx, cy], palette):
+                    continue
+
+                component.append((cx, cy))
+                if cx == 0 or cy == 0 or cx == w - 1 or cy == h - 1:
+                    touches_border = True
+
+                if cx > 0:
+                    queue.append((cx - 1, cy))
+                if cx + 1 < w:
+                    queue.append((cx + 1, cy))
+                if cy > 0:
+                    queue.append((cx, cy - 1))
+                if cy + 1 < h:
+                    queue.append((cx, cy + 1))
+
+            if touches_border or len(component) < min_area:
+                continue
+            for cx, cy in component:
+                bg_px[cx, cy] = 255
+
+    return bg_mask
+
+
 def _foreground_mask_from_white_bg(img: Image.Image) -> Image.Image:
     rgb = img.convert("RGB")
     bg_mask = _extract_white_background_mask(rgb)
+    bg_mask = _fill_enclosed_white_holes(rgb, bg_mask)
     subject = ImageOps.invert(bg_mask)
+    # Keep this cleanup deliberately light. Aggressive max/min morphology tends
+    # to seal narrow background gaps around fingers and props, leaving visible
+    # white pockets in the final overlay.
     subject = subject.filter(ImageFilter.MedianFilter(size=3))
-    subject = subject.point(lambda value: 255 if value >= 14 else 0)
-    subject = subject.filter(ImageFilter.MaxFilter(size=3))
-    subject = subject.filter(ImageFilter.MinFilter(size=3))
+    subject = subject.point(lambda value: 255 if value >= 18 else 0)
     return subject
+
+
+def _decontaminate_white_matte(rgba: Image.Image) -> Image.Image:
+    """Remove white matte spill from semi-transparent edge pixels."""
+    out = rgba.convert("RGBA")
+    px = out.load()
+    for y in range(out.height):
+        for x in range(out.width):
+            r, g, b, a = px[x, y]
+            if a <= 0 or a >= 255:
+                continue
+            nr = max(0, min(255, round(255 * (r - 255 + a) / a)))
+            ng = max(0, min(255, round(255 * (g - 255 + a) / a)))
+            nb = max(0, min(255, round(255 * (b - 255 + a) / a)))
+            px[x, y] = (nr, ng, nb, a)
+    return out
 
 
 def _alpha_bbox(alpha: Image.Image) -> tuple[int, int, int, int] | None:
@@ -160,6 +236,7 @@ def _build_soft_subject_rgba(img: Image.Image) -> tuple[Image.Image, Image.Image
 
     out = rgba.copy()
     out.putalpha(alpha)
+    out = _decontaminate_white_matte(out)
     overlay = Image.new("RGBA", rgba.size, (255, 255, 255, 0))
     overlay.paste((255, 0, 0, 96), mask=hard_mask)
     return out, alpha, overlay

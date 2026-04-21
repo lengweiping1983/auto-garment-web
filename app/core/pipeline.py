@@ -695,6 +695,13 @@ async def run_pipeline(
                 return prompt_map
             return None
 
+        def _resume_texture_prompts() -> dict | None:
+            path = work_dir / "texture_prompts.json"
+            if path.exists():
+                print(f"[RESUME] Loading texture_prompts from {path}")
+                return json.loads(path.read_text(encoding="utf-8"))
+            return None
+
         def _resume_hero_path() -> Path | None:
             hero_dir = work_dir / "neo_hero_motif"
             if hero_dir.exists():
@@ -764,9 +771,10 @@ async def run_pipeline(
 
         # Phase 2: Prompt generation
         prompt_map = _resume_prompt_map()
+        texture_prompts = _resume_texture_prompts()
         if prompt_map:
             _write_status(task_id, "analyzing", {"phase": "prompt_generation", "completed_steps": ["vision_analysis"], "current_step": "prompt_generation (resumed)"})
-            if not (work_dir / "texture_prompts.json").exists():
+            if not texture_prompts:
                 _, texture_prompts = generate_texture_prompts(visual, work_dir)
                 save_texture_prompts(texture_prompts, work_dir)
         else:
@@ -855,6 +863,10 @@ async def run_pipeline(
                     inject_front_split_motifs(texture_set_path, front_split_assets)
                     texture_set = json.loads(texture_set_path.read_text(encoding="utf-8"))
                     texture_set["_base_dir"] = str(work_dir.resolve())
+                    # Existing fill plans created before front motifs were injected
+                    # do not contain the required front overlay entries.
+                    fill_plan = build_fill_plan(pieces_payload, texture_set, garment_map, visual)
+                    _write_json(fill_plan_path, fill_plan)
                 print("[RESUME] Fill plan already exists, skipping.")
             else:
                 texture_set_path = _build_texture_set(work_dir, texture_paths, hero_path, prompt_map)

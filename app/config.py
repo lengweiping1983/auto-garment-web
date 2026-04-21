@@ -13,11 +13,11 @@ class Settings(BaseSettings):
     )
 
     # LLM
-    llm_provider: str = "openai"
+    llm_provider: str = "kimi-coding"
     llm_protocol: str = "openai"  # "openai" or "anthropic"
     llm_api_key: str = ""
-    llm_model: str = "gpt-4o"
-    llm_base_url: str = "https://api.openai.com/v1"
+    llm_model: str = "kimi-for-coding"
+    llm_base_url: str = "https://api.kimi.com/coding"
 
     # Neo AI
     neodomain_base_url: str = "https://story.neodomain.cn/agent/ai-image-generation"

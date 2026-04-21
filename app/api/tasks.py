@@ -9,7 +9,7 @@ from fastapi import APIRouter, BackgroundTasks, File, Form, HTTPException, Uploa
 
 from app.config import settings
 from app.core.image_utils import resolve_theme_image
-from app.core.pipeline import read_task_status, run_pipeline
+from app.core.pipeline import read_dirty_assets, read_task_status, run_pipeline
 from app.models.schemas import GarmentType, TaskCreateResponse, TaskStatusResponse
 
 router = APIRouter()
@@ -238,15 +238,8 @@ async def continue_render(task_id: str, background_tasks: BackgroundTasks):
             if p.exists():
                 texture_paths[tid] = p
 
-    missing = []
-    if not hero_path:
-        missing.append("主图")
-    for tid in ["texture_1", "texture_2", "texture_3"]:
-        if tid not in texture_paths:
-            missing.append(f"纹理 {[ 'texture_1', 'texture_2', 'texture_3'].index(tid) + 1}")
-
-    if missing:
-        raise HTTPException(status_code=400, detail=f"缺少必要资产，请手动上传: {', '.join(missing)}")
+    if not texture_paths:
+        raise HTTPException(status_code=400, detail="重新渲染至少需要保留 1 张纹理")
 
     # Find theme image
     theme_inputs_dir = work_dir / "theme_inputs"
@@ -270,6 +263,11 @@ async def continue_render(task_id: str, background_tasks: BackgroundTasks):
     user_prompt = config.get("user_prompt", "")
     neo_model = config.get("neo_model", "")
     neo_size = config.get("neo_size", "")
+    dirty_assets = read_dirty_assets(task_id)
+    target_texture_ids = ["texture_1", "texture_2", "texture_3"] if dirty_assets.get("hero") else dirty_assets.get("textures", [])
+    target_texture_ids = [tid for tid in target_texture_ids if tid in texture_paths]
+    if not target_texture_ids:
+        target_texture_ids = list(texture_paths.keys())
 
     # Update status before starting
     from app.core.pipeline import _write_status
@@ -277,6 +275,12 @@ async def continue_render(task_id: str, background_tasks: BackgroundTasks):
         "phase": "rendering",
         "completed_steps": ["vision_analysis", "prompt_generation", "neo_ai_generation", "front_split", "fill_plan"],
         "current_step": "rendering_variants",
+        "detail": {
+            "rerender_scope": {
+                "hero_changed": bool(dirty_assets.get("hero")),
+                "texture_ids": target_texture_ids,
+            },
+        },
     })
 
     background_tasks.add_task(
@@ -287,10 +291,17 @@ async def continue_render(task_id: str, background_tasks: BackgroundTasks):
         user_prompt=user_prompt,
         neo_model=neo_model,
         neo_size=neo_size,
+        force_render=True,
+        force_render_texture_ids=target_texture_ids,
+        allow_missing_hero=True,
     )
 
     return {
         "task_id": task_id,
         "status": "rendering",
         "message": "已开始渲染，所有资产已就绪",
+        "rerender_scope": {
+            "hero_changed": bool(dirty_assets.get("hero")),
+            "texture_ids": target_texture_ids,
+        },
     }

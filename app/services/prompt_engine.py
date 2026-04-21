@@ -76,7 +76,7 @@ def generate_texture_prompts(visual: dict, out_dir: Path) -> tuple[dict[str, str
 
     # Map texture_id → (purpose, panel, role, negative)
     meta = {
-        "hero_motif_1": ("AI生成主图透明定位图案", "single_hero", "placement_motif", HERO_NEGATIVE_EN),
+        "hero_motif_1": ("AI生成主图透明定位图案",   "single_hero", "hero_motif_1", HERO_NEGATIVE_EN),
         "texture_1":    ("纹理1",                  "single_texture", "base_texture",   TEXTURE_NEGATIVE_EN),
         "texture_2":    ("纹理2",                  "single_texture", "base_texture",   TEXTURE_NEGATIVE_EN),
         "texture_3":    ("纹理3",                  "single_texture", "base_texture",   TEXTURE_NEGATIVE_EN),
@@ -89,7 +89,7 @@ def generate_texture_prompts(visual: dict, out_dir: Path) -> tuple[dict[str, str
         # 1. Get LLM prompt; warn if missing (should never happen with good LLM)
         raw = generated_prompts.get(tid, "")
         if not raw:
-            print(f"[WARN] LLM did not return generated_prompts.{tid}, using empty string")
+            print(f"[WARN] LLM did not return prompt for {tid}, using empty string")
 
         # 2. Program fallback: ensure hero has transparent background
         if tid == "hero_motif_1":

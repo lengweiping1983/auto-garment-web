@@ -577,8 +577,8 @@ def enforce_validation(entries: list[dict], pieces_payload: dict, texture_set: d
             continue
         if base.get("fill_type") == "texture" and base.get("texture_id") not in texture_ids_set:
             old_id = base.get("texture_id")
-            base["texture_id"] = main_id
-            issues.append({"type": "fixed_invalid_texture", "severity": "high", "piece_id": entry["piece_id"], "old_texture_id": old_id, "new_texture_id": main_id, "message": f"texture_id {old_id} 不存在，已替换为 texture_1"})
+            base["texture_id"] = t1_id
+            issues.append({"type": "fixed_invalid_texture", "severity": "high", "piece_id": entry["piece_id"], "old_texture_id": old_id, "new_texture_id": t1_id, "message": f"texture_id {old_id} 不存在，已替换为 {t1_id}"})
 
     enforce_pair_texture_constraints(entries, garment_map, pieces_payload, texture_set, issues)
     return entries, issues

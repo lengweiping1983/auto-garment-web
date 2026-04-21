@@ -20,10 +20,42 @@ class NoCacheStaticFiles(StaticFiles):
         return response
 
 
+def _cleanup_old_tasks() -> None:
+    """Remove task directories older than max_task_age_days on startup."""
+    if not settings.storage_base_dir.exists():
+        return
+    import shutil
+    import time
+    from datetime import datetime, timedelta
+
+    cutoff = datetime.now() - timedelta(days=settings.max_task_age_days)
+    cutoff_ts = cutoff.timestamp()
+    removed = 0
+
+    for item in settings.storage_base_dir.iterdir():
+        if not item.is_dir():
+            continue
+        # Only remove directories that look like task dirs (have status.json)
+        if not (item / "status.json").exists():
+            continue
+        try:
+            mtime = item.stat().st_mtime
+            if mtime < cutoff_ts:
+                shutil.rmtree(item)
+                removed += 1
+                print(f"[CLEANUP] Removed old task dir: {item.name}")
+        except Exception as exc:
+            print(f"[CLEANUP] Failed to remove {item.name}: {exc}")
+
+    if removed:
+        print(f"[CLEANUP] Total removed: {removed} task(s) older than {settings.max_task_age_days} days")
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # Startup
     settings.storage_base_dir.mkdir(parents=True, exist_ok=True)
+    _cleanup_old_tasks()
     from app.core.neo_ai_client import NeoAIClient
     neo = NeoAIClient()
     print(f"[STARTUP] NeoAI token prefix: {neo.token[:20]}..." if neo.token else "[STARTUP] NeoAI token is EMPTY")

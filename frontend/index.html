@@ -564,6 +564,15 @@
             gap: 12px;
         }
 
+        .reference-item.is-selectable {
+            cursor: pointer;
+        }
+
+        .reference-item.is-selected {
+            border-color: rgba(58, 116, 216, 0.48);
+            box-shadow: 0 0 0 3px rgba(58, 116, 216, 0.14), 0 20px 34px rgba(49, 39, 30, 0.1);
+        }
+
         .ref-label {
             font-size: 13px;
             font-weight: 700;
@@ -658,31 +667,15 @@
             overflow: hidden;
         }
 
+        .reference-item .img-wrap.is-clickable {
+            cursor: zoom-in;
+        }
+
         .reference-item .img-wrap img {
             width: 100%;
             height: 100%;
             object-fit: contain;
             display: block;
-        }
-
-        .replace-overlay {
-            position: absolute;
-            inset: 0;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            background: rgba(21, 24, 33, 0.55);
-            color: #fff;
-            font-size: 13px;
-            font-weight: 600;
-            opacity: 0;
-            transition: opacity 0.2s ease;
-            cursor: pointer;
-            border-radius: 16px;
-        }
-
-        .reference-item[data-can-replace="true"]:hover .replace-overlay {
-            opacity: 1;
         }
 
         .btn-render {
@@ -1019,7 +1012,7 @@
                             <p>这里集中放主题图、主图和三组纹理。</p>
                         </div>
                         <div style="display:flex;align-items:center;gap:10px;">
-                            <button class="btn-render hidden" id="continueRenderBtn" onclick="continueRender()">继续渲染</button>
+                            <button class="btn-render hidden" id="continueRenderBtn" onclick="continueRender()">重新渲染</button>
                             <div class="surface-tag">素材面板</div>
                         </div>
                     </div>
@@ -1034,41 +1027,37 @@
                             <div class="ref-status ref-status-pending" id="refThemeStatus">等待上传</div>
                         </div>
 
-                        <div class="reference-item" data-type="hero">
+                        <div class="reference-item" data-type="hero" onclick="handleReferenceCardClick('hero', event)">
                             <div class="ref-label">主图</div>
-                            <div class="img-wrap" onclick="triggerAssetUpload('hero')">
+                            <div class="img-wrap" onclick="handleReferenceAssetClick('hero', event)">
                                 <img id="refHeroImg" src="" alt="主图" style="display:none;">
-                                <div class="replace-overlay">点击替换</div>
                             </div>
                             <div class="ref-placeholder upload-trigger" id="refHeroPlaceholder" onclick="triggerAssetUpload('hero')">等待生成...</div>
                             <div class="ref-status ref-status-pending" id="refHeroStatus">等待中</div>
                         </div>
 
-                        <div class="reference-item" data-type="texture_1">
+                        <div class="reference-item" data-type="texture_1" onclick="handleReferenceCardClick('texture_1', event)">
                             <div class="ref-label">纹理 1</div>
-                            <div class="img-wrap" onclick="triggerAssetUpload('texture_1')">
+                            <div class="img-wrap" onclick="handleReferenceAssetClick('texture_1', event)">
                                 <img id="refTexture_1Img" src="" alt="纹理1" style="display:none;">
-                                <div class="replace-overlay">点击替换</div>
                             </div>
                             <div class="ref-placeholder upload-trigger" id="refTexture_1Placeholder" onclick="triggerAssetUpload('texture_1')">等待生成...</div>
                             <div class="ref-status ref-status-pending" id="refTexture_1Status">等待中</div>
                         </div>
 
-                        <div class="reference-item" data-type="texture_2">
+                        <div class="reference-item" data-type="texture_2" onclick="handleReferenceCardClick('texture_2', event)">
                             <div class="ref-label">纹理 2</div>
-                            <div class="img-wrap" onclick="triggerAssetUpload('texture_2')">
+                            <div class="img-wrap" onclick="handleReferenceAssetClick('texture_2', event)">
                                 <img id="refTexture_2Img" src="" alt="纹理2" style="display:none;">
-                                <div class="replace-overlay">点击替换</div>
                             </div>
                             <div class="ref-placeholder upload-trigger" id="refTexture_2Placeholder" onclick="triggerAssetUpload('texture_2')">等待生成...</div>
                             <div class="ref-status ref-status-pending" id="refTexture_2Status">等待中</div>
                         </div>
 
-                        <div class="reference-item" data-type="texture_3">
+                        <div class="reference-item" data-type="texture_3" onclick="handleReferenceCardClick('texture_3', event)">
                             <div class="ref-label">纹理 3</div>
-                            <div class="img-wrap" onclick="triggerAssetUpload('texture_3')">
+                            <div class="img-wrap" onclick="handleReferenceAssetClick('texture_3', event)">
                                 <img id="refTexture_3Img" src="" alt="纹理3" style="display:none;">
-                                <div class="replace-overlay">点击替换</div>
                             </div>
                             <div class="ref-placeholder upload-trigger" id="refTexture_3Placeholder" onclick="triggerAssetUpload('texture_3')">等待生成...</div>
                             <div class="ref-status ref-status-pending" id="refTexture_3Status">等待中</div>
@@ -1133,13 +1122,15 @@
         let selectedTaskId = null;
         let pollInterval = null;
         let lastPolledStatus = null;
+        let lightboxAssetType = null;
+        let selectedReferenceType = null;
 
         function phaseDisplayName(status) {
             return {
                 pending: '等待中',
                 analyzing: '分析中',
                 generating: '生图中',
-                rendering: '渲染完成',
+                rendering: '渲染中...',
                 completed: '已完成',
                 failed: '失败',
                 waiting_assets: '待补图',
@@ -1166,17 +1157,21 @@
             }
         }
 
-        function openLightbox(src) {
+        function openLightbox(src, assetType = null) {
+            lightboxAssetType = assetType;
             document.getElementById('lightboxImg').src = src;
             document.getElementById('lightbox').classList.add('active');
         }
 
         function closeLightbox() {
+            lightboxAssetType = null;
             document.getElementById('lightbox').classList.remove('active');
             document.getElementById('lightboxImg').src = '';
         }
 
         document.addEventListener('click', (e) => {
+            const referenceItem = e.target.closest('.reference-item');
+            if (referenceItem && referenceItem.dataset.type !== 'theme') return;
             if (e.target.tagName === 'IMG' && !e.target.closest('.lightbox')) {
                 openLightbox(e.target.src);
             }
@@ -1184,6 +1179,14 @@
 
         document.addEventListener('keydown', (e) => {
             if (e.key === 'Escape') closeLightbox();
+            const targetEl = e.target instanceof Element ? e.target : null;
+            if ((e.key === 'Delete' || e.key === 'Backspace') && !(targetEl && targetEl.closest('input, textarea, select'))) {
+                const deleteTarget = lightboxAssetType || selectedReferenceType;
+                if (deleteTarget) {
+                    e.preventDefault();
+                    deleteReferenceAsset(deleteTarget);
+                }
+            }
         });
 
         loadTasks();
@@ -1222,6 +1225,7 @@
         function switchMode(mode) {
             if (mode === 'new') {
                 selectedTaskId = null;
+                setSelectedReference(null);
                 document.querySelectorAll('.task-item').forEach(el => el.classList.remove('selected'));
                 // sidebar always stays in new-task mode
                 document.getElementById('progressCard').classList.add('hidden');
@@ -1282,6 +1286,8 @@
         async function selectTask(taskId) {
             selectedTaskId = taskId;
             currentTaskId = taskId;
+            assetsModified = false;
+            setSelectedReference(null);
             document.querySelectorAll('.task-item').forEach(el => el.classList.remove('selected'));
             const el = document.querySelector(`.task-item[data-task-id="${taskId}"]`);
             if (el) el.classList.add('selected');
@@ -1297,7 +1303,7 @@
                     updateProgress(data);
                     updateReferenceImages(taskId, data.progress, data.status);
                     if (data.status === 'completed') {
-                        setDownloadEnabled(true);
+                        setDownloadEnabled(false);
                         showResults();
                     } else if (data.status === 'pending' || data.status === 'analyzing' || data.status === 'generating' || data.status === 'rendering' || data.status === 'waiting_assets') {
                         setDownloadEnabled(false);
@@ -1425,22 +1431,20 @@
                 if (data.status === 'completed') {
                     clearInterval(pollInterval);
                     pollInterval = null;
-                    setDownloadEnabled(true);
+                    setDownloadEnabled(false);
                     showResults();
                 } else if (data.status === 'failed') {
                     clearInterval(pollInterval);
                     pollInterval = null;
                 }
-                // Hide continue render button when not in waiting_assets
-                if (data.status !== 'waiting_assets') {
-                    document.getElementById('continueRenderBtn').classList.add('hidden');
-                }
+                checkAllAssetsReady();
             } catch (err) {
                 console.error(err);
             }
         }
 
         function resetReferenceImages() {
+            setSelectedReference(null);
             const themeImg = document.getElementById('refThemeImg');
             const themePlaceholder = document.getElementById('refThemePlaceholder');
             if (themeImg) { themeImg.style.display = 'none'; themeImg.src = ''; }
@@ -1454,11 +1458,129 @@
                 const placeholder = document.getElementById('ref' + cap + 'Placeholder');
                 const status = document.getElementById('ref' + cap + 'Status');
                 const item = img ? img.closest('.reference-item') : null;
+                const imgWrap = img ? img.closest('.img-wrap') : null;
                 if (img) { img.style.display = 'none'; img.src = ''; }
                 if (placeholder) { placeholder.style.display = 'flex'; placeholder.textContent = '等待生成...'; placeholder.classList.remove('upload-trigger'); }
                 if (status) { status.textContent = '等待中'; status.className = 'ref-status ref-status-pending'; }
-                if (item) item.setAttribute('data-can-replace', 'false');
+                if (imgWrap) imgWrap.classList.remove('is-clickable');
+                if (item) {
+                    item.setAttribute('data-can-replace', 'false');
+                    item.setAttribute('data-can-preview', 'false');
+                    item.classList.remove('is-selectable');
+                }
             });
+        }
+
+        function getReferenceElements(type) {
+            const cap = type.charAt(0).toUpperCase() + type.slice(1);
+            const img = document.getElementById('ref' + cap + 'Img');
+            const placeholder = document.getElementById('ref' + cap + 'Placeholder');
+            const statusEl = document.getElementById('ref' + cap + 'Status');
+            const item = img ? img.closest('.reference-item') : null;
+            const imgWrap = img ? img.closest('.img-wrap') : null;
+            return { img, placeholder, statusEl, item, imgWrap };
+        }
+
+        function setSelectedReference(type) {
+            selectedReferenceType = type;
+            document.querySelectorAll('.reference-item[data-type="hero"], .reference-item[data-type="texture_1"], .reference-item[data-type="texture_2"], .reference-item[data-type="texture_3"]').forEach(item => {
+                item.classList.toggle('is-selected', !!type && item.dataset.type === type);
+            });
+        }
+
+        function isReferenceDeletable(type) {
+            if (!['hero', 'texture_1', 'texture_2', 'texture_3'].includes(type)) return false;
+            if (isRunningStatus(lastPolledStatus || '')) return false;
+            const { img } = getReferenceElements(type);
+            return !!(img && img.src);
+        }
+
+        function handleReferenceCardClick(type, event) {
+            if (!['hero', 'texture_1', 'texture_2', 'texture_3'].includes(type)) return;
+            if (event.target.closest('.img-wrap, .ref-placeholder')) return;
+            if (!isReferenceDeletable(type)) {
+                setSelectedReference(null);
+                return;
+            }
+            setSelectedReference(selectedReferenceType === type ? null : type);
+        }
+
+        function handleReferenceAssetClick(type, event) {
+            event.stopPropagation();
+            const { img, item } = getReferenceElements(type);
+            const hasImage = !!(img && img.src);
+            const canReplace = item && item.getAttribute('data-can-replace') === 'true';
+
+            if (hasImage) {
+                setSelectedReference(isReferenceDeletable(type) ? type : null);
+                openLightbox(img.src, type);
+                return;
+            }
+
+            if (canReplace) {
+                triggerAssetUpload(type);
+            }
+        }
+
+        function applyDeletedReferenceState(type) {
+            const { img, placeholder, statusEl, item, imgWrap } = getReferenceElements(type);
+            if (img) {
+                img.style.display = 'none';
+                img.src = '';
+            }
+            if (imgWrap) {
+                imgWrap.style.display = 'none';
+                imgWrap.classList.remove('is-clickable');
+            }
+            if (placeholder) {
+                placeholder.style.display = 'flex';
+                placeholder.textContent = '点击上传';
+                placeholder.classList.remove('uploading');
+                placeholder.classList.add('upload-trigger');
+            }
+            if (statusEl) {
+                statusEl.textContent = '等待上传';
+                statusEl.className = 'ref-status ref-status-pending';
+            }
+            if (item) {
+                item.setAttribute('data-can-replace', 'true');
+                item.setAttribute('data-can-preview', 'false');
+                item.classList.remove('is-selectable');
+            }
+            assetsModified = true;
+            setSelectedReference(null);
+            if (lightboxAssetType === type) closeLightbox();
+            checkAllAssetsReady();
+        }
+
+        async function deleteReferenceAsset(type) {
+            if (!currentTaskId || !isReferenceDeletable(type)) return;
+
+            const labelMap = {
+                hero: '主图',
+                texture_1: '纹理 1',
+                texture_2: '纹理 2',
+                texture_3: '纹理 3',
+            };
+            if (!confirm(`确定删除${labelMap[type]}吗？\n\n删除后需要重新上传该图片，才可以继续渲染。`)) {
+                return;
+            }
+
+            let url = '';
+            if (type === 'hero') {
+                url = `/api/v1/tasks/${currentTaskId}/hero_motif`;
+            } else {
+                url = `/api/v1/tasks/${currentTaskId}/textures/${type}`;
+            }
+
+            try {
+                const res = await fetch(url, { method: 'DELETE' });
+                const data = await res.json();
+                if (!res.ok) throw new Error(data.detail || '删除失败');
+                applyDeletedReferenceState(type);
+            } catch (err) {
+                alert('删除失败: ' + err.message);
+            }
         }
 
         function updateReferenceImageItem(type, statusInfo, imageUrl, globalStatus) {
@@ -1478,9 +1600,13 @@
             }
 
             const isWaitingAssets = globalStatus === 'waiting_assets';
-            const canReplace = isWaitingAssets || globalStatus === 'completed';
+            const canReplace = !isRunningStatus(globalStatus);
             if (item) {
                 item.setAttribute('data-can-replace', canReplace ? 'true' : 'false');
+            }
+            if (item) {
+                item.setAttribute('data-can-preview', 'false');
+                item.classList.toggle('is-selectable', canReplace && !!img.src);
             }
             if (canReplace) {
                 placeholder.classList.add('upload-trigger');
@@ -1496,7 +1622,9 @@
             }[st] || st;
             statusEl.className = 'ref-status ref-status-' + st;
 
-            if (st === 'completed' && imageUrl) {
+            const shouldShowImage = (st === 'completed' && imageUrl) || (canReplace && imageUrl && st !== 'failed');
+
+            if (shouldShowImage) {
                 const newSrc = imageUrl + '?t=' + Date.now();
                 if (!img.src || img.src.split('?')[0] !== imageUrl) {
                     img.onerror = function() {
@@ -1516,16 +1644,28 @@
                     if (imgWrap) imgWrap.style.display = 'flex';
                     placeholder.style.display = 'none';
                 }
+                if (imgWrap) imgWrap.classList.add('is-clickable');
+                if (item) {
+                    item.setAttribute('data-can-preview', 'true');
+                    item.classList.toggle('is-selectable', canReplace);
+                }
             } else if (st === 'failed') {
                 placeholder.style.display = 'flex';
                 placeholder.textContent = '生成失败';
                 img.style.display = 'none';
                 if (imgWrap) imgWrap.style.display = 'none';
                 img.src = '';
+                if (imgWrap) imgWrap.classList.remove('is-clickable');
+                if (item) {
+                    item.setAttribute('data-can-preview', 'false');
+                    item.classList.remove('is-selectable');
+                }
             } else {
                 placeholder.style.display = 'flex';
                 if (st === 'running') {
                     placeholder.textContent = '生成中...';
+                } else if (canReplace && st === 'pending') {
+                    placeholder.textContent = '点击上传';
                 } else if (isWaitingAssets) {
                     placeholder.textContent = '点击上传';
                 } else {
@@ -1534,6 +1674,12 @@
                 img.style.display = 'none';
                 if (imgWrap) imgWrap.style.display = 'none';
                 img.src = '';
+                if (imgWrap) imgWrap.classList.remove('is-clickable');
+                if (item) {
+                    item.setAttribute('data-can-preview', 'false');
+                    item.classList.remove('is-selectable');
+                }
+                if (selectedReferenceType === type) setSelectedReference(null);
             }
         }
 
@@ -1639,11 +1785,13 @@
             document.getElementById('resultsCard').style.display = 'grid';
             const previewGrid = document.getElementById('previewGrid');
             previewGrid.innerHTML = '';
+            let hasExportableResults = false;
 
             try {
                 const res = await fetch(`/api/v1/tasks/${currentTaskId}/summary`);
                 const summary = await res.json();
                 const variants = summary['裁片模板变体'] || [];
+                hasExportableResults = variants.length > 0;
                 for (const v of variants) {
                     const tid = v['纹理ID'];
                     const num = _textureNumber(tid);
@@ -1671,6 +1819,7 @@
             } catch (e) {
                 console.error(e);
                 previewGrid.innerHTML = '<div class="empty-state">结果摘要加载失败。</div>';
+                hasExportableResults = false;
             }
 
             const piecesGrid = document.getElementById('piecesGrid');
@@ -1684,16 +1833,24 @@
                 `;
                 piecesGrid.appendChild(div);
             }
+            setDownloadEnabled(hasExportableResults);
             showingResults = false;
         }
 
         let pendingUploadType = null;
         let showingResults = false;
+        let assetsModified = false;
+        let manualRenderingUntil = 0;
+
+        function isRunningStatus(status) {
+            return ['pending', 'analyzing', 'generating', 'rendering'].includes(status);
+        }
 
         function triggerAssetUpload(type) {
             if (!currentTaskId) return;
             const item = document.querySelector(`.reference-item[data-type="${type}"]`);
             if (item && item.getAttribute('data-can-replace') !== 'true') return;
+            setSelectedReference(null);
             pendingUploadType = type;
             document.getElementById('assetFileInput').click();
         }
@@ -1756,6 +1913,7 @@
                 placeholder.classList.remove('uploading');
                 statusEl.textContent = '已完成';
                 statusEl.className = 'ref-status ref-status-completed';
+                assetsModified = true;
                 checkAllAssetsReady();
             } catch (err) {
                 alert('上传失败: ' + err.message);
@@ -1768,20 +1926,30 @@
 
         function checkAllAssetsReady() {
             const btn = document.getElementById('continueRenderBtn');
-            if (!currentTaskId) {
-                btn.classList.add('hidden');
+            if (!btn || !currentTaskId) {
+                if (btn) btn.classList.add('hidden');
                 return;
             }
-            const types = ['hero', 'texture_1', 'texture_2', 'texture_3'];
-            const allReady = types.every(type => {
+            const textureTypes = ['texture_1', 'texture_2', 'texture_3'];
+            const readyTextureCount = textureTypes.filter(type => {
                 const cap = type.charAt(0).toUpperCase() + type.slice(1);
                 const statusEl = document.getElementById('ref' + cap + 'Status');
                 return statusEl && statusEl.classList.contains('ref-status-completed');
-            });
-            // Only show continue render button in waiting_assets status
+            }).length;
             const globalStatus = lastPolledStatus || '';
-            const canShow = allReady && globalStatus === 'waiting_assets';
+
+            // Only the manual "continue/re-render" flow should expose a rendering button state.
+            if (Date.now() < manualRenderingUntil) {
+                btn.classList.remove('hidden');
+                btn.textContent = '渲染中...';
+                btn.disabled = true;
+                return;
+            }
+
+            const canShow = readyTextureCount > 0 && (assetsModified || globalStatus === 'waiting_assets');
             btn.classList.toggle('hidden', !canShow);
+            btn.textContent = '重新渲染';
+            btn.disabled = false;
         }
 
         async function continueRender() {
@@ -1789,6 +1957,8 @@
             const btn = document.getElementById('continueRenderBtn');
             btn.disabled = true;
             btn.textContent = '渲染中...';
+            manualRenderingUntil = Date.now() + 3000; // keep "渲染中..." for at least 3s
+            showingResults = false; // allow showResults() to refresh after re-render
             try {
                 const res = await fetch(`/api/v1/tasks/${currentTaskId}/continue_render`, { method: 'POST' });
                 const data = await res.json();
@@ -1796,14 +1966,13 @@
                 document.getElementById('progressCard').classList.remove('hidden');
                 document.getElementById('resultsCard').style.display = 'grid';
                 startPolling();
-                // Force hide continue render button after a short delay regardless of polling
-                setTimeout(() => {
-                    document.getElementById('continueRenderBtn').classList.add('hidden');
-                }, 8000);
+                // Ensure button state refreshes after grace period even if polling stopped
+                setTimeout(() => checkAllAssetsReady(), 3500);
             } catch (err) {
                 alert('渲染启动失败: ' + err.message);
+                manualRenderingUntil = 0;
                 btn.disabled = false;
-                btn.textContent = '继续渲染';
+                btn.textContent = '重新渲染';
             }
         }
 

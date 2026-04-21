@@ -9,6 +9,7 @@ from fastapi import APIRouter, File, HTTPException, UploadFile
 from fastapi.responses import FileResponse, StreamingResponse
 
 from app.config import settings
+from app.core.pipeline import mark_dirty_assets
 from app.models.schemas import AutomationSummary
 
 try:
@@ -42,6 +43,17 @@ def _summary_path(task_id: str) -> Path:
     return _task_dir(task_id) / "automation_summary.json"
 
 
+def _image_media_type(path: Path) -> str:
+    suffix = path.suffix.lower()
+    return {
+        ".png": "image/png",
+        ".jpg": "image/jpeg",
+        ".jpeg": "image/jpeg",
+        ".webp": "image/webp",
+        ".bmp": "image/bmp",
+    }.get(suffix, "application/octet-stream")
+
+
 @router.get("/tasks/{task_id}/theme_image")
 async def get_theme_image(task_id: str):
     """Get the original uploaded theme image."""
@@ -50,15 +62,7 @@ async def get_theme_image(task_id: str):
     if theme_inputs_dir.exists():
         for f in theme_inputs_dir.iterdir():
             if f.name.startswith("theme_image"):
-                suffix = f.suffix.lower()
-                media_types = {
-                    ".png": "image/png",
-                    ".jpg": "image/jpeg",
-                    ".jpeg": "image/jpeg",
-                    ".webp": "image/webp",
-                    ".bmp": "image/bmp",
-                }
-                return FileResponse(f, media_type=media_types.get(suffix, "application/octet-stream"))
+                return FileResponse(f, media_type=_image_media_type(f))
     raise HTTPException(status_code=404, detail="主题图不存在")
 
 
@@ -70,14 +74,7 @@ async def get_hero_motif(task_id: str):
     if hero_dir.exists():
         for f in sorted(hero_dir.iterdir(), key=lambda p: p.stat().st_mtime, reverse=True):
             if f.is_file() and f.suffix.lower() in {".png", ".jpg", ".jpeg", ".webp"}:
-                suffix = f.suffix.lower()
-                media_types = {
-                    ".png": "image/png",
-                    ".jpg": "image/jpeg",
-                    ".jpeg": "image/jpeg",
-                    ".webp": "image/webp",
-                }
-                return FileResponse(f, media_type=media_types.get(suffix, "application/octet-stream"))
+                return FileResponse(f, media_type=_image_media_type(f))
     raise HTTPException(status_code=404, detail="主图尚未生成")
 
 
@@ -212,7 +209,26 @@ async def upload_hero_motif(task_id: str, file: UploadFile = File(...)):
     data = await file.read()
     dest.write_bytes(data)
     _update_detail_field(task_id, "hero_motif", {"status": "completed", "path": str(dest.resolve())})
+    mark_dirty_assets(task_id, hero=True)
     return {"ok": True, "path": str(dest.resolve())}
+
+
+@router.delete("/tasks/{task_id}/hero_motif")
+async def delete_hero_motif(task_id: str):
+    """Delete the manually generated/uploaded hero motif image."""
+    task_dir = _task_dir(task_id)
+    if not task_dir.exists():
+        raise HTTPException(status_code=404, detail="任务不存在")
+
+    hero_dir = task_dir / "neo_hero_motif"
+    if hero_dir.exists():
+        for f in hero_dir.iterdir():
+            if f.is_file() and f.suffix.lower() in {".png", ".jpg", ".jpeg", ".webp"}:
+                f.unlink()
+
+    _update_detail_field(task_id, "hero_motif", {"status": "pending", "path": ""})
+    mark_dirty_assets(task_id, hero=True)
+    return {"ok": True, "deleted": True}
 
 
 @router.post("/tasks/{task_id}/textures/{texture_id}")
@@ -229,7 +245,27 @@ async def upload_texture(task_id: str, texture_id: str, file: UploadFile = File(
     dest = texture_dir / f"{texture_id}.png"
     dest.write_bytes(data)
     _update_detail_field(task_id, texture_id, {"status": "completed", "path": str(dest.resolve())})
+    mark_dirty_assets(task_id, textures=[texture_id])
     return {"ok": True, "path": str(dest.resolve())}
+
+
+@router.delete("/tasks/{task_id}/textures/{texture_id}")
+async def delete_texture(task_id: str, texture_id: str):
+    """Delete a manually generated/uploaded texture image."""
+    if texture_id not in {"texture_1", "texture_2", "texture_3"}:
+        raise HTTPException(status_code=400, detail="无效的纹理ID")
+
+    task_dir = _task_dir(task_id)
+    if not task_dir.exists():
+        raise HTTPException(status_code=404, detail="任务不存在")
+
+    path = task_dir / "neo_textures" / f"{texture_id}.png"
+    if path.exists():
+        path.unlink()
+
+    _update_detail_field(task_id, texture_id, {"status": "pending", "path": ""})
+    mark_dirty_assets(task_id, textures=[texture_id])
+    return {"ok": True, "deleted": True}
 
 
 def _ensure_svg(png_path: Path, svg_path: Path) -> bool:
@@ -249,15 +285,24 @@ def _ensure_svg(png_path: Path, svg_path: Path) -> bool:
 
 
 def _build_ext_zip(task_dir: Path, ext: str) -> io.BytesIO:
-    """Build ZIP buffer for a single file extension (png or svg)."""
+    """Build ZIP buffer for a single file extension (png or svg),
+    including previews and individual pieces for all variants."""
     buffer = io.BytesIO()
     with zipfile.ZipFile(buffer, "w", zipfile.ZIP_DEFLATED) as zf:
         variants_dir = task_dir / "variants"
         if variants_dir.exists():
             for i, variant_name in enumerate(["texture_1", "texture_2", "texture_3"], 1):
+                # Preview
                 file_path = variants_dir / variant_name / f"preview.{ext}"
                 if file_path.exists():
                     zf.write(file_path, f"preview{i}.{ext}")
+                # Individual pieces (PNG only; pieces have no SVG)
+                if ext == "png":
+                    pieces_dir = variants_dir / variant_name / "pieces"
+                    if pieces_dir.exists():
+                        for piece_file in sorted(pieces_dir.glob("*.png")):
+                            arcname = f"pieces/{variant_name}/{piece_file.name}"
+                            zf.write(piece_file, arcname)
     buffer.seek(0)
     return buffer
 
@@ -307,7 +352,7 @@ async def _download_package(task_id: str, kind: str):
         buffer = await asyncio.to_thread(_build_ext_zip, task_dir, "svg")
         filename = f"auto_garment_{task_id}_svg.zip"
     else:
-        # pngsvg — backward compat, both in one zip
+        # pngsvg — backward compat, both in one zip, now includes pieces/
         buffer = io.BytesIO()
         with zipfile.ZipFile(buffer, "w", zipfile.ZIP_DEFLATED) as zf:
             if variants_dir.exists():
@@ -318,6 +363,12 @@ async def _download_package(task_id: str, kind: str):
                     svg_path = variants_dir / variant_name / "preview.svg"
                     if svg_path.exists():
                         zf.write(svg_path, f"preview{i}.svg")
+                    # Individual pieces
+                    pieces_dir = variants_dir / variant_name / "pieces"
+                    if pieces_dir.exists():
+                        for piece_file in sorted(pieces_dir.glob("*.png")):
+                            arcname = f"pieces/{variant_name}/{piece_file.name}"
+                            zf.write(piece_file, arcname)
         buffer.seek(0)
         filename = f"auto_garment_{task_id}.zip"
 

@@ -51,6 +51,59 @@ uvicorn app.main:app --host 0.0.0.0 --port 3000 --reload
 
 访问 http://localhost:3000/ 打开前端页面。
 
+---
+
+## 自动部署（CI/CD）
+
+项目已配置 **GitHub Actions + SSH** 自动部署：每次 `push` 到 `main` 分支，自动连接到服务器拉取代码、安装依赖并重启服务。
+
+### 1. 配置 GitHub Secrets
+
+在仓库 Settings → Secrets and variables → Actions 中添加：
+
+| Secret | 说明 |
+|---|---|
+| `DEPLOY_HOST` | 服务器 IP 或域名 |
+| `DEPLOY_USER` | SSH 用户名 |
+| `DEPLOY_KEY` | SSH 私钥（`~/.ssh/id_rsa` 内容）|
+| `DEPLOY_PATH` | 服务器上代码绝对路径 |
+
+### 2. 服务器进程管理（推荐）
+
+不要用 `nohup`，改用进程管理器确保服务稳定：
+
+**Linux (systemd)**
+```bash
+# 修改 scripts/auto-garment-web.service 中的路径，然后：
+sudo cp scripts/auto-garment-web.service /etc/systemd/system/
+sudo systemctl daemon-reload
+sudo systemctl enable auto-garment-web
+sudo systemctl start auto-garment-web
+```
+
+**macOS (launchd)**
+```bash
+# 修改 scripts/auto-garment-web.plist 中的路径，然后：
+cp scripts/auto-garment-web.plist ~/Library/LaunchAgents/
+launchctl load ~/Library/LaunchAgents/auto-garment-web.plist
+launchctl start auto-garment-web
+```
+
+**PM2（跨平台）**
+```bash
+npm install -g pm2
+pm2 start "uvicorn app.main:app --host 0.0.0.0 --port 3000" --name auto-garment-web
+pm2 save
+pm2 startup
+```
+
+### 3. 手动触发部署
+
+如果 GitHub Actions 未配置，也可在服务器上直接运行：
+```bash
+./scripts/deploy.sh
+```
+
 ## API 端点
 
 | 方法 | 路径 | 说明 |

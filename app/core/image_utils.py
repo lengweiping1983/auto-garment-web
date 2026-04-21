@@ -120,3 +120,96 @@ def _copy_stable(src: Path, out_dir: Path) -> Path:
     if src.resolve() != dest.resolve():
         shutil.copy2(src, dest)
     return dest.resolve()
+
+
+# ---------------------------------------------------------------------------
+# Thumbnail generation
+# ---------------------------------------------------------------------------
+
+THUMB_SIZES = {
+    "reference": (400, 400),
+    "preview": (800, 800),
+    "piece": (400, 400),
+}
+
+
+def generate_thumbnail(
+    src_path: str | Path,
+    dest_path: str | Path,
+    max_size: tuple[int, int] = (400, 400),
+    quality: int = 85,
+) -> Path:
+    """Generate a thumbnail from source image, preserving aspect ratio.
+
+    Returns the destination path. If source does not exist, raises FileNotFoundError.
+    """
+    src = Path(src_path)
+    dest = Path(dest_path)
+    if not src.exists():
+        raise FileNotFoundError(f"Thumbnail source not found: {src}")
+
+    dest.parent.mkdir(parents=True, exist_ok=True)
+
+    with Image.open(src) as img:
+        # Convert palette/images to RGB/RGBA for consistent handling
+        if img.mode in ("P", "1", "L", "LA"):
+            if img.mode == "P" and "transparency" in img.info:
+                img = img.convert("RGBA")
+            else:
+                img = img.convert("RGB")
+        elif img.mode not in ("RGB", "RGBA"):
+            img = img.convert("RGB")
+
+        img.thumbnail(max_size, Image.Resampling.LANCZOS)
+
+        # Use PNG for images with transparency, JPEG for others to save size
+        has_alpha = img.mode == "RGBA"
+        if has_alpha:
+            # Keep PNG for alpha
+            img.save(dest, format="PNG", optimize=True)
+        else:
+            # Save as JPEG for smaller size; if dest already has .png suffix, keep it
+            if dest.suffix.lower() == ".png":
+                img.save(dest, format="PNG", optimize=True)
+            else:
+                img.convert("RGB").save(dest, format="JPEG", quality=quality, optimize=True)
+
+    return dest.resolve()
+
+
+def get_thumbnail_path(task_dir: Path, original_path: Path) -> Path:
+    """Compute thumbnail path for an original image inside a task directory.
+
+    Thumbnails are stored under {task_dir}/thumbnails/ mirroring the relative path.
+    """
+    try:
+        rel = original_path.resolve().relative_to(task_dir.resolve())
+    except ValueError:
+        # Fallback: hash the path
+        digest = hashlib.sha256(str(original_path).encode("utf-8")).hexdigest()[:12]
+        return task_dir / "thumbnails" / f"{digest}.jpg"
+    thumb = task_dir / "thumbnails" / rel
+    # Ensure we use .jpg for opaque thumbs unless original was png and we want to keep it
+    if thumb.suffix.lower() not in {".png", ".jpg", ".jpeg"}:
+        thumb = thumb.with_suffix(".jpg")
+    return thumb
+
+
+def ensure_thumbnail(
+    original_path: Path,
+    task_dir: Path,
+    max_size: tuple[int, int] = (400, 400),
+) -> Path:
+    """Ensure thumbnail exists; generate if missing. Returns thumbnail path."""
+    thumb_path = get_thumbnail_path(task_dir, original_path)
+    if thumb_path.exists():
+        return thumb_path
+    return generate_thumbnail(original_path, thumb_path, max_size=max_size)
+
+
+def _thumb_size_for_role(role: str) -> tuple[int, int]:
+    if role in ("preview", "front_pair_check", "preview_white"):
+        return THUMB_SIZES["preview"]
+    if role == "piece":
+        return THUMB_SIZES["piece"]
+    return THUMB_SIZES["reference"]

@@ -1,4 +1,5 @@
 """Result download and preview API endpoints."""
+import asyncio
 import io
 import json
 import zipfile
@@ -10,6 +11,7 @@ from fastapi.responses import FileResponse, StreamingResponse
 
 from app.config import settings
 from app.core.pipeline import mark_dirty_assets
+from app.core.image_utils import ensure_thumbnail, _thumb_size_for_role
 from app.models.schemas import AutomationSummary
 
 try:
@@ -55,81 +57,127 @@ def _image_media_type(path: Path) -> str:
 
 
 @router.get("/tasks/{task_id}/theme_image")
-async def get_theme_image(task_id: str):
-    """Get the original uploaded theme image."""
+async def get_theme_image(task_id: str, thumb: bool = False):
+    """Get the original uploaded theme image (or its thumbnail)."""
     task_dir = _task_dir(task_id)
     theme_inputs_dir = task_dir / "theme_inputs"
     if theme_inputs_dir.exists():
         for f in theme_inputs_dir.iterdir():
             if f.name.startswith("theme_image"):
+                if thumb:
+                    try:
+                        thumb_path = await asyncio.to_thread(ensure_thumbnail, f, task_dir, _thumb_size_for_role("theme"))
+                        return FileResponse(thumb_path, media_type=_image_media_type(thumb_path))
+                    except Exception:
+                        pass
                 return FileResponse(f, media_type=_image_media_type(f))
     raise HTTPException(status_code=404, detail="主题图不存在")
 
 
 @router.get("/tasks/{task_id}/hero_motif")
-async def get_hero_motif(task_id: str):
-    """Get the generated hero motif image."""
+async def get_hero_motif(task_id: str, thumb: bool = False):
+    """Get the generated hero motif image (or its thumbnail)."""
     task_dir = _task_dir(task_id)
     hero_dir = task_dir / "neo_hero_motif"
     if hero_dir.exists():
         for f in sorted(hero_dir.iterdir(), key=lambda p: p.stat().st_mtime, reverse=True):
             if f.is_file() and f.suffix.lower() in {".png", ".jpg", ".jpeg", ".webp"}:
+                if thumb:
+                    try:
+                        thumb_path = await asyncio.to_thread(ensure_thumbnail, f, task_dir, _thumb_size_for_role("hero"))
+                        return FileResponse(thumb_path, media_type=_image_media_type(thumb_path))
+                    except Exception:
+                        pass
                 return FileResponse(f, media_type=_image_media_type(f))
     raise HTTPException(status_code=404, detail="主图尚未生成")
 
 
 @router.get("/tasks/{task_id}/textures/{texture_id}")
-async def get_texture(task_id: str, texture_id: str):
-    """Get a generated texture image."""
+async def get_texture(task_id: str, texture_id: str, thumb: bool = False):
+    """Get a generated texture image (or its thumbnail)."""
     if texture_id not in {"texture_1", "texture_2", "texture_3"}:
         raise HTTPException(status_code=400, detail="无效的纹理ID")
     task_dir = _task_dir(task_id)
     path = task_dir / "neo_textures" / f"{texture_id}.png"
     if path.exists():
+        if thumb:
+            try:
+                thumb_path = await asyncio.to_thread(ensure_thumbnail, path, task_dir, _thumb_size_for_role("texture"))
+                return FileResponse(thumb_path, media_type=_image_media_type(thumb_path))
+            except Exception:
+                pass
         return FileResponse(path, media_type="image/png")
     raise HTTPException(status_code=404, detail="纹理图尚未生成")
 
 
 @router.get("/tasks/{task_id}/preview")
-async def get_preview(task_id: str, variant: str = ""):
+async def get_preview(task_id: str, variant: str = "", thumb: bool = False):
     """Get the main preview image (PNG with transparent background)."""
     if not variant:
         raise HTTPException(status_code=400, detail="必须指定 variant")
-    path = _task_dir(task_id) / "variants" / variant / "preview.png"
+    task_dir = _task_dir(task_id)
+    path = task_dir / "variants" / variant / "preview.png"
     if not path.exists():
         raise HTTPException(status_code=404, detail="预览图尚未生成")
+    if thumb:
+        try:
+            thumb_path = await asyncio.to_thread(ensure_thumbnail, path, task_dir, _thumb_size_for_role("preview"))
+            return FileResponse(thumb_path, media_type=_image_media_type(thumb_path))
+        except Exception:
+            pass
     return FileResponse(path, media_type="image/png")
 
 
 @router.get("/tasks/{task_id}/front_pair_check")
-async def get_front_pair_check(task_id: str, variant: str = ""):
+async def get_front_pair_check(task_id: str, variant: str = "", thumb: bool = False):
     """Get the front pair check image for a variant."""
     if not variant:
         raise HTTPException(status_code=400, detail="必须指定 variant")
-    path = _task_dir(task_id) / "variants" / variant / "front_pair_check.png"
+    task_dir = _task_dir(task_id)
+    path = task_dir / "variants" / variant / "front_pair_check.png"
     if not path.exists():
         raise HTTPException(status_code=404, detail="front_pair_check 不存在")
+    if thumb:
+        try:
+            thumb_path = await asyncio.to_thread(ensure_thumbnail, path, task_dir, _thumb_size_for_role("front_pair_check"))
+            return FileResponse(thumb_path, media_type=_image_media_type(thumb_path))
+        except Exception:
+            pass
     return FileResponse(path, media_type="image/png")
 
 
 @router.get("/tasks/{task_id}/preview_white")
-async def get_preview_white(task_id: str, variant: str = ""):
+async def get_preview_white(task_id: str, variant: str = "", thumb: bool = False):
     """Get the white-background preview image (JPG)."""
     if not variant:
         raise HTTPException(status_code=400, detail="必须指定 variant")
-    path = _task_dir(task_id) / "variants" / variant / "preview_white.jpg"
+    task_dir = _task_dir(task_id)
+    path = task_dir / "variants" / variant / "preview_white.jpg"
     if not path.exists():
         raise HTTPException(status_code=404, detail="白底预览图尚未生成")
+    if thumb:
+        try:
+            thumb_path = await asyncio.to_thread(ensure_thumbnail, path, task_dir, _thumb_size_for_role("preview_white"))
+            return FileResponse(thumb_path, media_type=_image_media_type(thumb_path))
+        except Exception:
+            pass
     return FileResponse(path, media_type="image/jpeg")
 
 
 @router.get("/tasks/{task_id}/pieces/{piece_id}")
-async def get_piece(task_id: str, piece_id: str, variant: str = ""):
-    """Get a single rendered piece PNG."""
+async def get_piece(task_id: str, piece_id: str, variant: str = "", thumb: bool = False):
+    """Get a single rendered piece PNG (or its thumbnail)."""
     if not variant:
         raise HTTPException(status_code=400, detail="必须指定 variant")
-    path = _task_dir(task_id) / "variants" / variant / "pieces" / f"{piece_id}.png"
+    task_dir = _task_dir(task_id)
+    path = task_dir / "variants" / variant / "pieces" / f"{piece_id}.png"
     if path.exists():
+        if thumb:
+            try:
+                thumb_path = await asyncio.to_thread(ensure_thumbnail, path, task_dir, _thumb_size_for_role("piece"))
+                return FileResponse(thumb_path, media_type=_image_media_type(thumb_path))
+            except Exception:
+                pass
         return FileResponse(path, media_type="image/png")
     raise HTTPException(status_code=404, detail="裁片不存在或尚未生成")
 

@@ -23,6 +23,7 @@ from app.core.neo_ai_client import NeoAIClient
 
 from PIL import Image
 from app.core.renderer import render_all, compose_preview
+from app.core.image_utils import generate_thumbnail, _thumb_size_for_role
 from app.services.front_split_service import create_front_split_assets, inject_front_split_motifs
 from app.services.fill_plan_service import build_fill_plan
 from app.services.prompt_engine import generate_texture_prompts, save_texture_prompts
@@ -472,6 +473,24 @@ async def _gen_texture(
         return exc
 
 
+async def _generate_variant_thumbnails(variant_dir: Path, task_dir: Path):
+    """Generate thumbnails for all images inside a variant directory."""
+    try:
+        for img_path in variant_dir.iterdir():
+            if not img_path.is_file():
+                continue
+            if img_path.suffix.lower() in {".png", ".jpg", ".jpeg", ".webp"}:
+                role = "preview" if "preview" in img_path.name else "front_pair_check"
+                await asyncio.to_thread(generate_thumbnail, img_path, task_dir / "thumbnails" / img_path.relative_to(task_dir), _thumb_size_for_role(role))
+        pieces_dir = variant_dir / "pieces"
+        if pieces_dir.exists():
+            for img_path in pieces_dir.iterdir():
+                if img_path.is_file() and img_path.suffix.lower() in {".png", ".jpg", ".jpeg", ".webp"}:
+                    await asyncio.to_thread(generate_thumbnail, img_path, task_dir / "thumbnails" / img_path.relative_to(task_dir), _thumb_size_for_role("piece"))
+    except Exception as e:
+        print(f"[WARN] Variant thumbnail generation failed: {e}")
+
+
 async def _process_variant_when_ready(
     tid: str,
     texture_paths: dict[str, Path],
@@ -544,6 +563,7 @@ async def _process_variant_when_ready(
 
     rendered = await asyncio.to_thread(render_all, pieces_payload, variant_set, variant_fill_plan, variant_dir, variant_texture_set_path)
     await asyncio.to_thread(compose_preview, pieces_payload, rendered, variant_dir / "preview.png")
+    await _generate_variant_thumbnails(variant_dir, work_dir)
 
     _write_status(task_id, "rendering", {
         "phase": "rendering",
@@ -864,6 +884,7 @@ async def run_pipeline(
                 print(f"[RENDER] Render complete for variant {texture_id}, composing preview...")
                 compose_preview(pieces_payload, rendered, variant_dir / "preview.png")
                 print(f"[RENDER] Preview composed for variant {texture_id}")
+                await _generate_variant_thumbnails(variant_dir, work_dir)
 
                 texture_path = ""
                 for t in texture_set.get("textures", []):
@@ -981,6 +1002,10 @@ async def run_pipeline(
                     else:
                         hero_path = result
                         print(f"[OK] Hero generated: {hero_path}")
+                        try:
+                            await asyncio.to_thread(generate_thumbnail, hero_path, work_dir / "thumbnails" / hero_path.relative_to(work_dir), _thumb_size_for_role("hero"))
+                        except Exception as e:
+                            print(f"[WARN] Hero thumbnail generation failed: {e}")
                         if not front_split_done:
                             try:
                                 front_split_assets = create_front_split_assets(hero_path, work_dir)
@@ -1007,6 +1032,10 @@ async def run_pipeline(
                     else:
                         texture_paths[tid] = result
                         print(f"[OK] Texture {tid} generated: {result}")
+                        try:
+                            await asyncio.to_thread(generate_thumbnail, result, work_dir / "thumbnails" / result.relative_to(work_dir), _thumb_size_for_role("texture"))
+                        except Exception as e:
+                            print(f"[WARN] Texture {tid} thumbnail generation failed: {e}")
                         if not serial_rendering and hero_path and front_split_done and tid not in processed_variants:
                             await _process_variant_when_ready(
                                 tid, texture_paths, hero_path, front_split_assets,
@@ -1119,6 +1148,7 @@ async def run_pipeline(
 
                 rendered = render_all(pieces_payload, variant_set, variant_fill_plan, variant_dir, variant_texture_set_path)
                 compose_preview(pieces_payload, rendered, variant_dir / "preview.png")
+                await _generate_variant_thumbnails(variant_dir, work_dir)
 
                 texture_path = ""
                 for t in texture_set.get("textures", []):

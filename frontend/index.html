@@ -1175,11 +1175,12 @@
         }
 
         document.addEventListener('click', (e) => {
-            const referenceItem = e.target.closest('.reference-item');
+            const img = e.target.closest('img');
+            if (!img || img.closest('.lightbox')) return;
+            const referenceItem = img.closest('.reference-item');
             if (referenceItem && referenceItem.dataset.type !== 'theme') return;
-            if (e.target.tagName === 'IMG' && !e.target.closest('.lightbox')) {
-                openLightbox(e.target.src);
-            }
+            const fullSrc = img.dataset.fullSrc || img.src;
+            openLightbox(fullSrc);
         });
 
         document.addEventListener('keydown', (e) => {
@@ -1527,7 +1528,7 @@
 
             if (hasImage) {
                 setSelectedReference(isReferenceDeletable(type) ? type : null);
-                openLightbox(img.src, type);
+                openLightbox(img.dataset.fullSrc || img.src, type);
                 return;
             }
 
@@ -1641,7 +1642,8 @@
             const shouldShowImage = (st === 'completed' && imageUrl) || (canReplace && imageUrl && st !== 'failed');
 
             if (shouldShowImage) {
-                const newSrc = imageUrl + '?t=' + Date.now();
+                const thumbUrl = imageUrl + '?thumb=1';
+                const newSrc = thumbUrl + '&t=' + Date.now();
                 if (!img.src || img.src.split('?')[0] !== imageUrl) {
                     img.onerror = function() {
                         img.style.display = 'none';
@@ -1655,10 +1657,12 @@
                         placeholder.style.display = 'none';
                     };
                     img.src = newSrc;
+                    img.dataset.fullSrc = imageUrl;
                 } else {
                     img.style.display = 'block';
                     if (imgWrap) imgWrap.style.display = 'flex';
                     placeholder.style.display = 'none';
+                    img.dataset.fullSrc = imageUrl;
                 }
                 if (imgWrap) imgWrap.classList.add('is-clickable');
                 if (item) {
@@ -1722,11 +1726,13 @@
                         if (themeImgWrap) themeImgWrap.style.display = 'flex';
                         if (themePlaceholder) themePlaceholder.style.display = 'none';
                     };
-                    themeImg.src = themeUrl + '?t=' + Date.now();
+                    themeImg.src = themeUrl + '?thumb=1&t=' + Date.now();
+                    themeImg.dataset.fullSrc = themeUrl;
                 } else {
                     themeImg.style.display = 'block';
                     if (themeImgWrap) themeImgWrap.style.display = 'flex';
                     if (themePlaceholder) themePlaceholder.style.display = 'none';
+                    themeImg.dataset.fullSrc = themeUrl;
                 }
             }
             const refStatus = detail.reference_image;
@@ -1831,18 +1837,20 @@
                     const tid = v['纹理ID'];
                     const num = _textureNumber(tid);
 
+                    const fpUrl = apiUrl(`/api/v1/tasks/${currentTaskId}/front_pair_check?variant=${tid}`);
                     const fpDiv = document.createElement('div');
                     fpDiv.className = 'preview-item';
                     fpDiv.innerHTML = `
-                        <img src="${apiUrl(`/api/v1/tasks/${currentTaskId}/front_pair_check?variant=${tid}`)}&t=${Date.now()}" alt="预览${num} 对位检查" onerror="this.style.display='none'">
+                        <img src="${fpUrl}&thumb=1&t=${Date.now()}" data-full-src="${fpUrl}" alt="预览${num} 对位检查" onerror="this.style.display='none'">
                         <h4>预览 ${num} · 对位检查</h4>
                     `;
                     previewGrid.appendChild(fpDiv);
 
+                    const pwUrl = apiUrl(`/api/v1/tasks/${currentTaskId}/preview_white?variant=${tid}`);
                     const pwDiv = document.createElement('div');
                     pwDiv.className = 'preview-item';
                     pwDiv.innerHTML = `
-                        <img src="${apiUrl(`/api/v1/tasks/${currentTaskId}/preview_white?variant=${tid}`)}&t=${Date.now()}" alt="预览${num} 白底预览" onerror="this.style.display='none'">
+                        <img src="${pwUrl}&thumb=1&t=${Date.now()}" data-full-src="${pwUrl}" alt="预览${num} 白底预览" onerror="this.style.display='none'">
                         <h4>预览 ${num} · 白底预览</h4>
                     `;
                     previewGrid.appendChild(pwDiv);
@@ -1862,10 +1870,11 @@
             if (defaultVariantId) {
                 for (let i = 1; i <= 9; i++) {
                     const pid = `piece_${String(i).padStart(3, '0')}_s`;
+                    const pieceUrl = apiUrl(`/api/v1/tasks/${currentTaskId}/pieces/${pid}?variant=${defaultVariantId}`);
                     const div = document.createElement('div');
                     div.className = 'piece-thumb';
                     div.innerHTML = `
-                        <img src="${apiUrl(`/api/v1/tasks/${currentTaskId}/pieces/${pid}?variant=${defaultVariantId}`)}&t=${Date.now()}" alt="${pid}" onerror="this.parentElement.style.display='none'">
+                        <img src="${pieceUrl}&thumb=1&t=${Date.now()}" data-full-src="${pieceUrl}" alt="${pid}" onerror="this.parentElement.style.display='none'">
                     `;
                     piecesGrid.appendChild(div);
                 }
@@ -1942,13 +1951,13 @@
                     if (imgWrap) imgWrap.style.display = 'flex';
                     placeholder.style.display = 'none';
                 };
-                if (type === 'theme') {
-                    img.src = apiUrl(`/api/v1/tasks/${currentTaskId}/theme_image`) + '?t=' + Date.now();
-                } else if (type === 'hero') {
-                    img.src = apiUrl(`/api/v1/tasks/${currentTaskId}/hero_motif`) + '?t=' + Date.now();
-                } else {
-                    img.src = apiUrl(`/api/v1/tasks/${currentTaskId}/textures/${type}`) + '?t=' + Date.now();
-                }
+                const baseUrl = type === 'theme'
+                    ? apiUrl(`/api/v1/tasks/${currentTaskId}/theme_image`)
+                    : type === 'hero'
+                        ? apiUrl(`/api/v1/tasks/${currentTaskId}/hero_motif`)
+                        : apiUrl(`/api/v1/tasks/${currentTaskId}/textures/${type}`);
+                img.src = baseUrl + '?thumb=1&t=' + Date.now();
+                img.dataset.fullSrc = baseUrl;
                 placeholder.classList.remove('uploading');
                 statusEl.textContent = '已完成';
                 statusEl.className = 'ref-status ref-status-completed';

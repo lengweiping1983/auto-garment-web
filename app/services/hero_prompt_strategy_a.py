@@ -137,9 +137,9 @@ VISION_SYSTEM_PROMPT_A = """
   },
   "generated_prompts": {
     "hero_motif_1": "一个最终英文正向 prompt，长度约100-220词，直接可用于图像生成。基于 struct 中主主体与次主体信息，只描述最终要生成的定位印花主体，不要解释过程，不要写中文，不要写提示语说明。用途是商业上装的白底定位印花（placement print），不是海报、贴纸、包装图或整件服装效果图。必须写入：主体精确类别与数量、整体轮廓与体量、主色/辅色/点缀色及近似 HEX、主体自身材质与表面光学特性、姿态动作朝向、关键纹样与边缘特征。若主体本身可透光或半透明，只能描述主体自身质感，绝不能把背景写成透明。必须原样包含这些短语：isolated foreground subject only, pure white background, no shadow, no floor, no scenery, no extra objects, no text, no logo, no watermark, centered complete subject, full uncropped figure, clean crisp edges, apparel placement graphic, apparel-safe print graphic。禁止出现：transparent background, alpha background, PNG cutout, background removal, checkerboard preview, fake transparency grid, sticker cutout, isolated on transparent, seamless, tileable, repeat pattern, all-over print, fabric swatch, wallpaper, packaging paper, garment mockup, fashion model, mannequin, person wearing garment, 3D render。",
-    "texture_1": "一个最终英文正向 prompt，长度约70-120词，直接可用于图像生成。它表示面积最大的主底纹，必须只描述纯图案本身，不要解释过程，不要写中文，不要写任何元说明。用途是商业上装大身面料印花，不是海报、贴纸、场景图、白底单主体图。必须与原图底纹在主题元素、排列方式、密度、色彩比例、线条粗细上高度一致。必须写成无缝平铺的 2D 面料印花，并与 texture_2、texture_3 共享同一色板与同一艺术风格。必须原样包含这些短语：seamless pattern, tileable, all-over print, flat 2D, flat color, no folds, fabric texture, apparel-safe textile design。禁止出现：pure white background, isolated foreground subject only, centered complete subject, full uncropped figure, placement graphic, transparent background, alpha background, garment mockup, fashion model, mannequin, person wearing garment, scenery, poster, sticker, product photo。",
-    "texture_2": "一个最终英文正向 prompt，长度约60-100词，直接可用于图像生成。它表示与 texture_1 协调的次级图案或辅助纹理，必须只描述纯图案本身，不要解释过程，不要写中文，不要写任何元说明。它与 texture_1 使用完全相同的色彩体系和艺术表现语言，但在元素尺度、疏密、抽象程度上形成层次差异。必须是无缝平铺的 2D 面料图案，不能写成人物、服装效果、白底单主体。必须原样包含这些短语：seamless pattern, tileable, coordinated palette, flat 2D, flat color, fabric texture。禁止出现：pure white background, isolated foreground subject only, centered complete subject, full uncropped figure, placement graphic, transparent background, alpha background, garment mockup, fashion model, mannequin, person wearing garment, scenery, poster, sticker, product photo。",
-    "texture_3": "一个最终英文正向 prompt，长度约40-80词，直接可用于图像生成。它表示最小尺度的微装饰纹理，只描述纯图案本身，不要解释过程，不要写中文，不要写任何元说明。它必须与 texture_1、texture_2 保持同一色板和同一艺术风格，但重复单元最小、密度受控、只作为点缀。必须是无缝平铺的 2D 面料图案，不能出现白底主体、模特、穿着效果或场景。必须原样包含这些短语：micro pattern, small repeat, seamless, tileable, flat 2D, delicate detail, fabric texture, flat color。禁止出现：pure white background, isolated foreground subject only, centered complete subject, full uncropped figure, placement graphic, transparent background, alpha background, garment mockup, fashion model, mannequin, person wearing garment, scenery, poster, sticker, product photo。"
+    "texture_1": "一个最终英文正向 prompt，直接可用于图像生成。它对应 main，表示面积最大的主底纹。必须从参考图提炼主面料的背景色、笔触和小型 repeat 元素，只描述纯图案本身，不要解释过程，不要写中文，不要写任何元说明。必须写成英文 seamless tileable visible repeat pattern prompt，并明确写出具体小元素名称，如 botanical / geometric / line / dot。必须包含 motif_scale_relative、density_estimate、negative_space_ratio 三项，且要落到数值：elements are 3-8% of tile width，12-20 elements per tile，45-55% breathing room。element_type_mix 应偏向 botanical 0.6 / geometric_dot 0.3 / organic_line 0.1。必须与 texture_2、texture_3 共享同一 palette 和 brush language。禁止写成 abstract wash、plain texture、paper grain only、gradient、empty background、tonal atmosphere only、blurred background、scene、landscape。",
+    "texture_2": "一个最终英文正向 prompt，直接可用于图像生成。它对应 secondary，表示与 texture_1 协调的次级图案或辅助纹理。必须从参考图提炼辅面料的协调小元素、线条或格纹结构，只描述纯图案本身，不要解释过程，不要写中文，不要写任何元说明。必须写成英文 coordinating seamless tileable visible repeat pattern prompt，明确写出协调 repeat 结构，如 lattice / linework / leaves / dots / geometric。必须包含 motif_scale_relative、density_estimate、negative_space_ratio 三项，且要落到数值：elements are 2-6% of tile width，15-25 elements per tile，50-60% breathing room。element_type_mix 应偏向 botanical 0.4 / geometric 0.4 / organic_line 0.2。必须与 texture_1 共享同一 palette 和 brush language。禁止写成 abstract wash、plain texture、paper grain only、gradient、empty background、tonal atmosphere only、scene。",
+    "texture_3": "一个最终英文正向 prompt，直接可用于图像生成。它对应 accent_light，表示最小尺度的轻量点缀纹理。必须从参考图提炼轻量点缀元素和小尺度 repeat，只描述纯图案本身，不要解释过程，不要写中文，不要写任何元说明。必须写成英文 small-scale accent repeat prompt，强调极小规模元素、高密度点缀但负空间充足，并且不得喧宾夺主。必须包含 motif_scale_relative、density_estimate、negative_space_ratio 三项，且要落到数值：elements are 1-4% of tile width，20-40 elements per tile，60-75% breathing room。element_type_mix 应偏向 botanical 0.3 / geometric_dot 0.5 / organic_line 0.2。必须与 texture_1、texture_2 保持同一 palette 和 brush language。禁止出现白底主体、模特、穿着效果、场景，或任何会让图案抢走主视觉的描述。"
   }
 }
 ```
@@ -214,101 +214,6 @@ VISION_SYSTEM_PROMPT_A = """
 - 我是否已经主动规避了敏感词、违禁词和容易触发审核的高风险表达？
 """
 
-
-_PANEL_CONTRADICTION_PATTERNS = {
-    "hero_motif_1": (
-        r"\bseamless\b",
-        r"\btileable\b",
-        r"\ball-over print\b",
-        r"\brepeat(?: pattern)?\b",
-        r"\bfabric texture\b",
-        r"\bpattern swatch\b",
-        r"\btextile print\b",
-    ),
-    "texture_1": (
-        r"\bmodel\b",
-        r"\bmannequin\b",
-        r"\bperson\b",
-        r"\bwearing garment\b",
-        r"\bgarment mockup\b",
-        r"\bt-?shirt mockup\b",
-        r"\bplacement graphic\b",
-        r"\bcentered complete subject\b",
-        r"\bfull uncropped figure\b",
-        r"\bpure white background\b",
-        r"\b(?:handwritten|printed|decorative)\s+text\b",
-        r"\b(?:words?|letters?|typography|caption|title|label)s?\b",
-        r"\b(?:logo|watermark|signage)\b",
-        r"\bsoft focus\b",
-        r"\bout-?of-?focus\b",
-        r"\bbokeh\b",
-        r"\bdepth of field\b",
-        r"\bshallow depth of field\b",
-        r"\bmisty\b",
-        r"\bhazy\b",
-        r"\bfoggy\b",
-        r"\bdreamy\b",
-        r"\bethereal\b",
-        r"\bfuzzy\b",
-        r"\bwashed out\b",
-    ),
-    "texture_2": (
-        r"\bmodel\b",
-        r"\bmannequin\b",
-        r"\bperson\b",
-        r"\bwearing garment\b",
-        r"\bgarment mockup\b",
-        r"\bt-?shirt mockup\b",
-        r"\bplacement graphic\b",
-        r"\bcentered complete subject\b",
-        r"\bfull uncropped figure\b",
-        r"\bpure white background\b",
-        r"\b(?:handwritten|printed|decorative)\s+text\b",
-        r"\b(?:words?|letters?|typography|caption|title|label)s?\b",
-        r"\b(?:logo|watermark|signage)\b",
-        r"\bsoft focus\b",
-        r"\bout-?of-?focus\b",
-        r"\bbokeh\b",
-        r"\bdepth of field\b",
-        r"\bshallow depth of field\b",
-        r"\bmisty\b",
-        r"\bhazy\b",
-        r"\bfoggy\b",
-        r"\bdreamy\b",
-        r"\bethereal\b",
-        r"\bfuzzy\b",
-        r"\bwashed out\b",
-    ),
-    "texture_3": (
-        r"\bmodel\b",
-        r"\bmannequin\b",
-        r"\bperson\b",
-        r"\bwearing garment\b",
-        r"\bgarment mockup\b",
-        r"\bt-?shirt mockup\b",
-        r"\bplacement graphic\b",
-        r"\bcentered complete subject\b",
-        r"\bfull uncropped figure\b",
-        r"\bpure white background\b",
-        r"\b(?:handwritten|printed|decorative)\s+text\b",
-        r"\b(?:words?|letters?|typography|caption|title|label)s?\b",
-        r"\b(?:logo|watermark|signage)\b",
-        r"\bsoft focus\b",
-        r"\bout-?of-?focus\b",
-        r"\bbokeh\b",
-        r"\bdepth of field\b",
-        r"\bshallow depth of field\b",
-        r"\bmisty\b",
-        r"\bhazy\b",
-        r"\bfoggy\b",
-        r"\bdreamy\b",
-        r"\bethereal\b",
-        r"\bfuzzy\b",
-        r"\bwashed out\b",
-    ),
-}
-
-
 def _ensure_white_background_hero(prompt: str) -> str:
     if not prompt:
         return prompt
@@ -352,8 +257,6 @@ def _ensure_white_background_hero(prompt: str) -> str:
 
 def _merge_panel_prompt(raw: str, panel_id: str) -> str:
     text = raw or ""
-    for pattern in _PANEL_CONTRADICTION_PATTERNS.get(panel_id, ()):
-        text = re.sub(pattern, "", text, flags=re.IGNORECASE)
     base_contract = PANEL_DEFAULTS_EN.get(panel_id, "")
     if base_contract:
         text = f"{text}, {base_contract}" if text else base_contract

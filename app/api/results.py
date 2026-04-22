@@ -363,16 +363,16 @@ async def _download_package(task_id: str, kind: str):
 
     variants_dir = task_dir / "variants"
     if variants_dir.exists() and kind in ("svg", "pngsvg"):
-        # Pre-generate missing SVGs
-        svg_tasks = []
+        # Pre-generate missing SVGs (serial, one by one)
         for variant_name in ["texture_1", "texture_2", "texture_3"]:
             svg_path = variants_dir / variant_name / "preview.svg"
             if not svg_path.exists():
                 png_path = variants_dir / variant_name / "preview.png"
                 if png_path.exists():
-                    svg_tasks.append(asyncio.to_thread(_ensure_svg, png_path, svg_path))
-        if svg_tasks:
-            await asyncio.gather(*svg_tasks, return_exceptions=True)
+                    try:
+                        await asyncio.to_thread(_ensure_svg, png_path, svg_path)
+                    except Exception:
+                        pass
 
     if kind == "png":
         buffer = await asyncio.to_thread(_build_ext_zip, task_dir, "png")

@@ -27,6 +27,21 @@ _TEXTURE_CONTRADICTION_PATTERNS = {
         r"\bcentered complete subject\b",
         r"\bfull uncropped figure\b",
         r"\bpure white background\b",
+        r"\b(?:handwritten|printed|decorative)\s+text\b",
+        r"\b(?:words?|letters?|typography|caption|title|label)s?\b",
+        r"\b(?:logo|watermark|signage)\b",
+        r"\bsoft focus\b",
+        r"\bout-?of-?focus\b",
+        r"\bbokeh\b",
+        r"\bdepth of field\b",
+        r"\bshallow depth of field\b",
+        r"\bmisty\b",
+        r"\bhazy\b",
+        r"\bfoggy\b",
+        r"\bdreamy\b",
+        r"\bethereal\b",
+        r"\bfuzzy\b",
+        r"\bwashed out\b",
     ),
     "texture_2": (
         r"\bmodel\b",
@@ -39,6 +54,21 @@ _TEXTURE_CONTRADICTION_PATTERNS = {
         r"\bcentered complete subject\b",
         r"\bfull uncropped figure\b",
         r"\bpure white background\b",
+        r"\b(?:handwritten|printed|decorative)\s+text\b",
+        r"\b(?:words?|letters?|typography|caption|title|label)s?\b",
+        r"\b(?:logo|watermark|signage)\b",
+        r"\bsoft focus\b",
+        r"\bout-?of-?focus\b",
+        r"\bbokeh\b",
+        r"\bdepth of field\b",
+        r"\bshallow depth of field\b",
+        r"\bmisty\b",
+        r"\bhazy\b",
+        r"\bfoggy\b",
+        r"\bdreamy\b",
+        r"\bethereal\b",
+        r"\bfuzzy\b",
+        r"\bwashed out\b",
     ),
     "texture_3": (
         r"\bmodel\b",
@@ -51,6 +81,21 @@ _TEXTURE_CONTRADICTION_PATTERNS = {
         r"\bcentered complete subject\b",
         r"\bfull uncropped figure\b",
         r"\bpure white background\b",
+        r"\b(?:handwritten|printed|decorative)\s+text\b",
+        r"\b(?:words?|letters?|typography|caption|title|label)s?\b",
+        r"\b(?:logo|watermark|signage)\b",
+        r"\bsoft focus\b",
+        r"\bout-?of-?focus\b",
+        r"\bbokeh\b",
+        r"\bdepth of field\b",
+        r"\bshallow depth of field\b",
+        r"\bmisty\b",
+        r"\bhazy\b",
+        r"\bfoggy\b",
+        r"\bdreamy\b",
+        r"\bethereal\b",
+        r"\bfuzzy\b",
+        r"\bwashed out\b",
     ),
 }
 
@@ -187,7 +232,7 @@ VISION_SYSTEM_PROMPT_B = """
   "fusion_strategy": {"primary_reference": 1, "hero_subject_source": [1], "palette_sources": [1], "style_sources": [1], "strategy_note": ""},
   "theme_to_piece_strategy": {
     "base_atmosphere": "大身低噪底纹如何继承主题色彩/氛围，不直接复制主体",
-    "hero_motif": "组合主卖点元素，建议放置在前片/指定 hero 裁片；如果 dominant_objects 中有多个 S/A 级 hero_motif，必须组合保留，不要三选一",
+    "hero_motif": "组合主卖点元素，建议放置在前片/指定 hero 裁片；如果 dominant_objects 中有多个 S/A 级 hero_motif，必须组合保留，不要三选一，并让主体之间保持可见间距，不要贴在一起",
     "accent_details": "小花、叶片、蘑菇等只作小面积点缀",
     "quiet_zones": "袖片、后片、领口、窄条等需要安静处理的区域",
     "do_not_use_as_full_body_texture": ["不适合大面积满版的具象元素"]
@@ -226,7 +271,7 @@ VISION_SYSTEM_PROMPT_B = """
 5. `theme_to_piece_strategy`
    - 把主题工程化拆成 `base_atmosphere`、`hero_motif`、`accent_details`、`quiet_zones`、`do_not_use_as_full_body_texture`。
    - 如果 `dominant_objects` 中有多个 `grade in {S, A}` 且 `suggested_usage = hero_motif` 的主体，
-     `theme_to_piece_strategy.hero_motif` 必须明确写出：组合保留全部主体，不要三选一。
+     `theme_to_piece_strategy.hero_motif` 必须明确写出：组合保留全部主体，不要三选一；主体之间保留可见留白和呼吸感，不要贴合、重叠或共边。
 
 6. `reference_fidelity` / `design_dna` / `single_texture_derivation` / `hero_texture_fusion_plan`
    - 明确主图必须保留什么、纹理从图中提炼什么，以及主图和纹理如何保持同一套设计语言。
@@ -264,7 +309,7 @@ VISION_SYSTEM_PROMPT_B = """
 
 3. 如果某个维度观察不清晰，写 `not clearly visible`，不要编造。
 
-4. 若存在多个 `S/A + hero_motif` 主体，`hero_motif_1` 必须保留全部主体，组合成一个 cohesive foreground placement graphic，不能三选一。
+4. 若存在多个 `S/A + hero_motif` 主体，`hero_motif_1` 必须保留全部主体，组合成一个 cohesive foreground placement graphic，不能三选一；但主体不能挤成一团，必须彼此分开并保留可见间距。
 
 5. `hero_motif_1` 必须明确包含这些语义：
 - `preserve and recreate the primary subject(s) from the user's reference image as much as possible`
@@ -279,6 +324,13 @@ VISION_SYSTEM_PROMPT_B = """
 - `complete uncropped subject`
 - `full head and hair visible`
 - `centered complete subject`
+
+7. 多主体排布要求（关键）
+- 当 `hero_motif_1` 中存在多个主体时，必须把它们排成一个 balanced separated group，而不是 compact cluster。
+- 主体之间必须保留 moderate spacing / visible white gap / breathing room。
+- 禁止主体之间 touching / overlap / merged silhouette / shared outer contour / heavy occlusion。
+- 每个主体都必须 individually readable、individually extractable、轮廓独立完整。
+- 若主体数量较多，可适度缩小单个主体来换取间距，但不能删除主体，也不能把多个主体压成一个连在一起的大轮廓。
 
 6. `hero_motif_1` 禁止写成：
 - `transparent PNG cutout`
@@ -372,8 +424,10 @@ def _enrich_hero_prompt_b(visual: dict, base_hero_prompt: str) -> str:
         prefix_parts.append(
             "Composite hero requirement: include every listed hero subject in one cohesive foreground apparel placement graphic. "
             "Preserve the recognizable relative roles from the reference image, keep each subject complete and readable, "
-            "arrange them as a balanced compact group suitable for splitting across left and right front garment pieces, "
-            "and simplify only minor background clutter. Do not omit any listed hero subject; do not reduce the hero graphic to only one subject."
+            "arrange them as a balanced separated group suitable for splitting across left and right front garment pieces, "
+            "keep moderate spacing and visible white breathing room between subjects, and do not let subjects touch, overlap, merge, or share outer contours. "
+            "Keep every subject individually readable and individually extractable, and if needed scale subjects slightly smaller to preserve separation while keeping all of them. "
+            "Simplify only minor background clutter. Do not omit any listed hero subject; do not reduce the hero graphic to only one subject; do not collapse the group into a compact cluster."
             + (f" Required subjects: {names}." if names else "")
         )
     elif candidates:
@@ -399,7 +453,7 @@ def _prepare_visual_for_scheme_b(visual: dict) -> dict:
             theme_strategy["hero_motif"] = (
                 "组合主卖点定位图案：保留并组合 "
                 + "、".join(subject_names)
-                + "，形成一个可前片定位的白底主图，不做三选一。"
+                + "，形成一个可前片定位的白底主图，不做三选一；主体之间保持清晰可见的间距和呼吸感，不要贴合、重叠或连成一个外轮廓。"
             )
         prepared["theme_to_piece_strategy"] = theme_strategy
 

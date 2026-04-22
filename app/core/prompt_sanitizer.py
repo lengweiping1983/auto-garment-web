@@ -233,6 +233,14 @@ BLUR_RISK_PHRASES = {
     "subtle grain": "",
     "grain": "",
     "low contrast": "",
+    "soft focus": "",
+    "out-of-focus": "",
+    "shallow depth of field": "",
+    "depth of field": "",
+    "bokeh": "",
+    "misty": "",
+    "washed out": "",
+    "fuzzy": "",
     "soft fading edges": "clean anti-aliased edges",
     "fading edges": "clean edges",
     "gradient ground": "flat color ground",
@@ -254,7 +262,7 @@ BLUR_RISK_PHRASES = {
 
 # 单独单词级别的模糊风险词（主要出现在 positive prompt 中会导致糊化）
 BLUR_RISK_WORDS = frozenset({
-    "distressed", "stipple", "blotchy", "hazy", "foggy", "dreamy", "ethereal",
+    "distressed", "stipple", "blotchy", "hazy", "foggy", "dreamy", "ethereal", "misty", "fuzzy",
 })
 
 # 这些词在 negative prompt 中是合法的反模糊禁止语，在 positive 中才是风险

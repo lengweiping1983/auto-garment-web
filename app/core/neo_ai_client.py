@@ -51,6 +51,19 @@ class NeoAIClient:
         url = f"https://wlpaas.oss-cn-shanghai.aliyuncs.com/{remote_path}"
         return url
 
+    async def list_models(self) -> list[dict]:
+        """Return available image-generation models from Neo AI."""
+        response = await self.client.get(
+            f"{self.base_url}/models",
+            headers={"accessToken": self.token},
+        )
+        response.raise_for_status()
+        result = response.json()
+        if result.get("success") is False:
+            raise RuntimeError(f"Failed to list Neo AI models: {result.get('errMessage', 'Unknown error')}")
+        data = result.get("data")
+        return data if isinstance(data, list) else []
+
     async def submit_generation(
         self,
         prompt: str,
@@ -67,13 +80,12 @@ class NeoAIClient:
         payload = {
             "modelName": model or settings.neodomain_default_model,
             "prompt": prompt,
-            "negativePrompt": negative_prompt,
             "size": size or settings.neodomain_default_size,
             "numImages": str(num_images),
             "outputFormat": "png",
             "aspectRatio": "1:1",
             "guidanceScale": 7.5,
-            "safetyTolerance": "5",
+            "safetyTolerance": "10",
             "showPrompt": True,
         }
         if reference_images:

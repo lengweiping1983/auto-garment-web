@@ -1,11 +1,11 @@
-"""Scheme B: skill-style transparent hero prompt while keeping A textures."""
+"""Scheme B: structured white-background hero prompt while keeping A textures."""
 
 from __future__ import annotations
 
 from pathlib import Path
 import re
 
-from app.core.prompt_blocks import PANEL_DEFAULTS_EN, TEXTURE_NEGATIVE_EN
+from app.core.prompt_blocks import HERO_NEGATIVE_EN, PANEL_DEFAULTS_EN, TEXTURE_NEGATIVE_EN
 
 from app.services.hero_prompt_strategy_base import (
     HeroPromptStrategy,
@@ -14,17 +14,6 @@ from app.services.hero_prompt_strategy_base import (
     prepare_image_generation_payload,
 )
 
-
-HERO_NEGATIVE_EN_B = (
-    "text, labels, captions, titles, typography, words, letters, signage, logo, watermark, "
-    "plain light box, colored background box, filled rectangle, background art, scenery, landscape, environment, "
-    "checkerboard transparency preview, fake transparency grid, semi-transparent full-image patch, "
-    "gradient wash fade to transparent, colored fringe on edge, halo effect around subject, "
-    "full illustration scene, poster composition, sticker sheet, garment mockup, fashion model, mannequin, "
-    "person wearing garment, product photo, lookbook, ground shadow, vignette, "
-    "botanical backdrop, foliage behind subject, painted wash behind subject, garden background, meadow background, "
-    "blurry, out of focus, smeared, smudged, distorted, deformed, low quality, jpeg artifacts, grainy"
-)
 
 _TEXTURE_CONTRADICTION_PATTERNS = {
     "texture_1": (
@@ -75,8 +64,8 @@ VISION_SYSTEM_PROMPT_B = """
 你的重点不是生成通用描述，而是为服装系统提供：
 - 可追溯的主体/辅助元素结构
 - 主题如何落到裁片的工程化策略
-- 一条高保真的 `hero_motif_1` 透明主图提示词
-- 三条保持当前 Web 项目命名的纹理提示词：`texture_1`、`texture_2`、`texture_3`
+- 一条高保真的 `hero_motif_1` 白底主图提示词
+- 三条纹理提示词，键名必须严格使用约定的固定字段名：`texture_1`、`texture_2`、`texture_3`；不要改名，不要输出别名
 
 最终回复必须是**单个合法 JSON 对象**，不要输出 Markdown、代码围栏或额外解释文字。
 
@@ -189,11 +178,11 @@ VISION_SYSTEM_PROMPT_B = """
   },
   "hero_edge_contract": {
     "min_margin_ratio": 0.30,
-    "edge_fade_pixels": "2-6px soft anti-aliased edge only, no gradient halo beyond 6px",
-    "forbidden_alpha_patterns": ["gradient wash fade to transparent", "semi-transparent halo around subject", "colored fringe on edge", "feathered edge wider than 8px"],
-    "required_alpha_behavior": "hard binary alpha inside subject silhouette, single-pixel soft anti-alias at boundary, pure transparent outside, no intermediate gray-alpha band"
+    "edge_fade_pixels": "2-6px soft anti-aliased edge only",
+    "forbidden_alpha_patterns": ["gradient halo", "semi-transparent halo around subject", "colored fringe on edge", "feathered edge wider than 8px"],
+    "required_alpha_behavior": "keep the subject contour clean and readable on a pure white solid background without halo, fringe, or fake transparency artifacts"
   },
-  "hero_texture_fusion_plan": "透明主图与三张纹理如何共享色彩、笔触、边缘处理和元素呼应",
+  "hero_texture_fusion_plan": "白底主图与三张纹理如何共享色彩、笔触、边缘处理和元素呼应",
   "source_images": [{"index": 1, "path": "/absolute/path/to/image.png", "role": "primary"}],
   "fusion_strategy": {"primary_reference": 1, "hero_subject_source": [1], "palette_sources": [1], "style_sources": [1], "strategy_note": ""},
   "theme_to_piece_strategy": {
@@ -211,7 +200,7 @@ VISION_SYSTEM_PROMPT_B = """
     "hero_violations": []
   },
   "generated_prompts": {
-    "hero_motif_1": "英文 isolated foreground hero motif only as transparent PNG cutout with real alpha background。结构要求：先写主体观察段（覆盖 identity/pose/expression/hair/clothing/props/accessories/composition/art_style_details 全部9维），再接透明格式约束。必须：1) preserve and recreate the primary subject from reference image；2) complete uncropped subject, full head and hair visible；3) 主体边界到图像边缘至少 30% 留白（min_margin_ratio 0.30）；4) 边缘仅 2-6px 软抗锯齿，禁止 gradient halo / semi-transparent halo / colored fringe；5) alpha 内部为硬二值，边界单像素软过渡，外部纯透明；6) no background, no checkerboard preview, no fake grid, no colored box, no plain light box, no scenery, no garden, no foliage, no painted wash, no vignette, no ground shadow",
+    "hero_motif_1": "英文 white-background foreground hero motif prompt。结构要求：先写主体观察段（覆盖 identity/pose/expression/hair/clothing/props/accessories/composition/art_style_details 全部9维），再接白底定位图格式约束。必须：1) preserve and recreate the primary subject from reference image；2) complete uncropped subject, full head and hair visible；3) pure white solid background；4) clean crisp edges with no halo / no colored fringe；5) no shadow, no floor, no scenery, no garden, no foliage, no painted wash, no vignette；6) apparel placement graphic, commercial garment print",
     "texture_1": "一个最终英文正向 prompt，长度约70-120词，直接可用于图像生成。它表示面积最大的主底纹，必须只描述纯图案本身，不要解释过程，不要写中文，不要写任何元说明。用途是商业上装大身面料印花，不是海报、贴纸、场景图、白底单主体图。必须与原图底纹在主题元素、排列方式、密度、色彩比例、线条粗细上高度一致。必须写成无缝平铺的 2D 面料印花，并与 texture_2、texture_3 共享同一色板与同一艺术风格。必须原样包含这些短语：seamless pattern, tileable, all-over print, flat 2D, no shading, no folds, fabric texture, commercial apparel textile。禁止出现：pure white background, isolated foreground subject only, centered complete subject, full uncropped figure, placement graphic, transparent background, alpha background, garment mockup, fashion model, mannequin, person wearing garment, scenery, poster, sticker, product photo。",
     "texture_2": "一个最终英文正向 prompt，长度约60-100词，直接可用于图像生成。它表示与 texture_1 协调的次级图案或辅助纹理，必须只描述纯图案本身，不要解释过程，不要写中文，不要写任何元说明。它与 texture_1 使用完全相同的色彩体系和艺术表现语言，但在元素尺度、疏密、抽象程度上形成层次差异。必须是无缝平铺的 2D 面料图案，不能写成人物、服装效果、白底单主体。必须原样包含这些短语：seamless pattern, tileable, coordinated palette, flat 2D, no shading, fabric texture。禁止出现：pure white background, isolated foreground subject only, centered complete subject, full uncropped figure, placement graphic, transparent background, alpha background, garment mockup, fashion model, mannequin, person wearing garment, scenery, poster, sticker, product photo。",
     "texture_3": "一个最终英文正向 prompt，长度约40-80词，直接可用于图像生成。它表示最小尺度的微装饰纹理，只描述纯图案本身，不要解释过程，不要写中文，不要写任何元说明。它必须与 texture_1、texture_2 保持同一色板和同一艺术风格，但重复单元最小、密度受控、只作为点缀。必须是无缝平铺的 2D 面料图案，不能出现白底主体、模特、穿着效果或场景。必须原样包含这些短语：micro pattern, small-scale repeat, seamless, tileable, flat 2D, accent detail, fabric texture, no shading。禁止出现：pure white background, isolated foreground subject only, centered complete subject, full uncropped figure, placement graphic, transparent background, alpha background, garment mockup, fashion model, mannequin, person wearing garment, scenery, poster, sticker, product photo。"
@@ -243,7 +232,7 @@ VISION_SYSTEM_PROMPT_B = """
    - 明确主图必须保留什么、纹理从图中提炼什么，以及主图和纹理如何保持同一套设计语言。
 
 7. `hero_edge_contract`
-   - 必须输出：
+   - 如能判断请输出：
      - `min_margin_ratio`
      - `edge_fade_pixels`
      - `forbidden_alpha_patterns`
@@ -252,16 +241,16 @@ VISION_SYSTEM_PROMPT_B = """
      - `min_margin_ratio >= 0.30`
      - 仅允许 `2-6px` soft anti-aliased edge
      - 禁止 `gradient halo / semi-transparent halo / colored fringe`
-     - alpha 内部硬二值，外部纯透明
+     - 纯白实体背景上的主体边界要清晰，不得出现伪透明感
 
 8. `generated_prompts`
    - 只生成英文 `hero_motif_1`、`texture_1`、`texture_2`、`texture_3` 四条提示词。
    - `texture_1/2/3` 保持当前 Web 项目用途：三条纯图案平铺纹理。
-   - `hero_motif_1` 必须是前景主体透明 cutout。
+   - `hero_motif_1` 必须是前景主体白底图。
 
 ## hero_motif_1 特别要求
 
-1. 先写主体观察段，再写透明格式约束。
+1. 先写主体观察段，再写白底格式约束。
 2. 主体观察段必须覆盖 9 个维度：
 - `subject_identity`
 - `pose_action`
@@ -280,19 +269,23 @@ VISION_SYSTEM_PROMPT_B = """
 5. `hero_motif_1` 必须明确包含这些语义：
 - `preserve and recreate the primary subject(s) from the user's reference image as much as possible`
 - `isolated foreground motif only`
-- `transparent PNG cutout`
-- `real alpha background`
-- `no background`
-- `no checkerboard transparency preview`
-- `no fake transparency grid`
-- `no colored box`
+- `pure white background`
+- `no shadow`
+- `no floor`
+- `no scenery`
+- `clean crisp edges`
+- `apparel placement graphic`
+- `commercial garment print`
 - `complete uncropped subject`
 - `full head and hair visible`
-- `generous transparent margin above and around the subject`
+- `centered complete subject`
 
 6. `hero_motif_1` 禁止写成：
-- `pure white background`
-- 白底商品图
+- `transparent PNG cutout`
+- `real alpha background`
+- `transparent background`
+- `checkerboard transparency preview`
+- `fake transparency grid`
 - scene / garden / meadow / landscape / environment
 - botanical backdrop / painted wash / vignette
 - seamless / tileable / repeat pattern
@@ -313,7 +306,7 @@ VISION_SYSTEM_PROMPT_B = """
 - `dominant_objects[]` 必须包含 `grade`。
 - `dominant_objects[]` 必须包含 `garment_placement_hint`。
 - `generated_prompts.texture_1/texture_2/texture_3` 必须是纯平铺纹理，不得出现白底主体、模特、穿着效果、场景。
-- `generated_prompts.hero_motif_1` 不得出现 `pure white background`、`seamless`、`tileable`、`repeat pattern`。
+- `generated_prompts.hero_motif_1` 必须出现 `pure white background`，且不得出现 `transparent png cutout`、`real alpha background`、`seamless`、`tileable`、`repeat pattern`。
 - 人物、脸、角色、动物、商品、图标、物体都允许作为 `hero_motif_1` 的主体，只要它们是用户参考图的主要内容。
 
 ## 输出前自检
@@ -322,8 +315,7 @@ VISION_SYSTEM_PROMPT_B = """
 - `hero_motif_1` 是否覆盖了全部 9 个主体观察维度？
 - 是否存在多个 hero 主体却只保留了一个？
 - `theme_to_piece_strategy.hero_motif` 是否与多主体组合规则一致？
-- `hero_edge_contract` 是否完整？
-- `hero_motif_1` 是否仍然是 transparent cutout，而不是白底或平铺纹理？
+- `hero_motif_1` 是否仍然是白底图，而不是透明 cutout 或平铺纹理？
 - `texture_1/2/3` 是否仍然保持纯图案平铺，没有 hero 词汇污染？
 """
 
@@ -395,7 +387,7 @@ def _prepare_visual_for_scheme_b(visual: dict) -> dict:
             theme_strategy["hero_motif"] = (
                 "组合主卖点定位图案：保留并组合 "
                 + "、".join(subject_names)
-                + "，形成一个可前片定位的透明主图，不做三选一。"
+                + "，形成一个可前片定位的白底主图，不做三选一。"
             )
         prepared["theme_to_piece_strategy"] = theme_strategy
 
@@ -407,13 +399,11 @@ def _prepare_visual_for_scheme_b(visual: dict) -> dict:
     return prepared
 
 
-def _force_transparent_motif_prompt(prompt_text: str) -> str:
+def _force_white_background_motif_prompt(prompt_text: str) -> str:
     required = (
-        "isolated foreground motif only, transparent PNG cutout, real alpha background, "
-        "empty transparent pixels around the subject, no background, no background art, "
-        "no plain light background, no plain warm background, no colored background box, "
-        "no filled rectangular background, no checkerboard transparency preview, no fake transparency grid, "
-        "no scenery, no semi-transparent full-image patch"
+        "isolated foreground motif only, pure white background, no shadow, no floor, no scenery, "
+        "no background art, no extra objects, centered complete subject, full uncropped figure, "
+        "clean crisp edges, apparel placement graphic, commercial garment print"
     )
     hero_required = (
         "hero_motif_1 must preserve and recreate the primary subject from the user's reference image as much as possible, "
@@ -422,32 +412,49 @@ def _force_transparent_motif_prompt(prompt_text: str) -> str:
         "hero_motif_1 must be foreground subject only, no scene, no garden, "
         "no meadow, no landscape, no environment, no foliage behind subject, "
         "no botanical backdrop, no painted wash behind subject, no vignette, "
-        "no rectangular composition, no full illustration scene, no checkerboard transparency preview, "
-        "no fake transparency grid, no ground shadow"
+        "no transparent background, no alpha background, no PNG cutout, no ground shadow"
     )
     text = prompt_text.strip()
+    replacements = {
+        "transparent png cutout": "pure white background",
+        "transparent background": "pure white background",
+        "transparent alpha background": "pure white background",
+        "alpha background": "pure white background",
+        "real alpha background": "pure white background",
+        "background removal": "pure white background",
+        "checkerboard transparency preview": "pure white background",
+        "fake transparency grid": "pure white background",
+        "no background": "pure white background",
+        "cutout": "clean crisp edges",
+    }
+    for old, new in replacements.items():
+        text = text.replace(old, new)
+        text = text.replace(old.title(), new)
+        text = text.replace(old.upper(), new.upper())
     for old in (
         "plain light background",
         "plain warm background",
         "removable plain background",
         "removable plain backgrounds",
         "suitable for background removal",
-        "full illustration scene",
-        "rectangular composition",
         "botanical backdrop",
         "foliage behind subject",
         "painted wash behind subject",
         "garden background",
         "background art",
-        "pure white background",
-        "no shadow",
-        "no floor",
+        "transparent",
+        "alpha",
     ):
-        text = text.replace(old, "transparent alpha background")
+        text = text.replace(old, "pure white background")
     text = text.replace("as as possible", "as much as possible")
     lower = text.lower()
-    if "transparent png cutout" in lower and "real alpha background" in lower:
-        return f"{text}, no colored background box, no semi-transparent full-image patch, {hero_required}"
+    if (
+        "pure white background" in lower
+        and "clean crisp edges" in lower
+        and "apparel placement graphic" in lower
+        and "commercial garment print" in lower
+    ):
+        return f"{text}, {hero_required}"
     return f"{text}, {required}, {hero_required}"
 
 
@@ -461,7 +468,7 @@ class HeroPromptStrategyB(HeroPromptStrategy):
         generated_prompts = visual.get("generated_prompts", {})
         texture_ids = ["hero_motif_1", "texture_1", "texture_2", "texture_3"]
         meta = {
-            "hero_motif_1": ("AI生成主图透明定位图案", "single_hero", "hero_motif_1", HERO_NEGATIVE_EN_B),
+            "hero_motif_1": ("AI生成主图白底图", "single_hero", "hero_motif_1", HERO_NEGATIVE_EN),
             "texture_1": ("纹理1", "single_texture", "base_texture", TEXTURE_NEGATIVE_EN),
             "texture_2": ("纹理2", "single_texture", "base_texture", TEXTURE_NEGATIVE_EN),
             "texture_3": ("纹理3", "single_texture", "base_texture", TEXTURE_NEGATIVE_EN),
@@ -476,24 +483,7 @@ class HeroPromptStrategyB(HeroPromptStrategy):
                 print(f"[WARN] LLM did not return prompt for {tid}, using empty string")
 
             if tid == "hero_motif_1":
-                raw = _force_transparent_motif_prompt(raw)
-                edge_contract = visual.get("hero_edge_contract", {}) if isinstance(visual, dict) else {}
-                if isinstance(edge_contract, dict) and edge_contract:
-                    parts = []
-                    min_margin = edge_contract.get("min_margin_ratio")
-                    if isinstance(min_margin, (int, float)):
-                        parts.append(f"minimum {int(float(min_margin) * 100)}% transparent margin around subject")
-                    fade = edge_contract.get("edge_fade_pixels", "")
-                    if fade:
-                        parts.append(f"edge fade: {fade}")
-                    alpha_behavior = edge_contract.get("required_alpha_behavior", "")
-                    if alpha_behavior:
-                        parts.append(f"alpha behavior: {alpha_behavior}")
-                    forbidden = edge_contract.get("forbidden_alpha_patterns", [])
-                    if forbidden:
-                        parts.append(f"forbidden: {', '.join(str(item) for item in forbidden)}")
-                    if parts:
-                        raw = f"{raw}, edge contract: {', '.join(parts)}"
+                raw = _force_white_background_motif_prompt(raw)
                 raw = dedupe_prompt_chunks(clean_prompt_text(raw))
             else:
                 # Intentionally duplicated texture_1/2/3 behavior from scheme A so scheme B

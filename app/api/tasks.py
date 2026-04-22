@@ -9,7 +9,8 @@ from fastapi import APIRouter, BackgroundTasks, File, Form, HTTPException, Uploa
 
 from app.config import settings
 from app.core.image_utils import resolve_theme_image
-from app.core.pipeline import clear_front_split_assets, clear_rerender_outputs, read_dirty_assets, read_task_status, run_pipeline
+from app.core.neo_ai_client import NeoAIClient
+from app.core.pipeline import clear_front_split_assets, clear_rerender_outputs, read_dirty_assets, read_task_status, run_pipeline, _set_rerender_state
 from app.models.schemas import GarmentType, TaskCreateResponse, TaskStatusResponse
 
 router = APIRouter()
@@ -25,6 +26,21 @@ def _validate_garment_type(garment_type: str) -> str:
     elif "防晒" in gt or "sun" in gt:
         return "防晒服"
     raise HTTPException(status_code=400, detail=f"不支持的服装类型: {garment_type}。仅支持 T恤 和 防晒服。")
+
+
+@router.get("/neo_models")
+async def list_neo_models():
+    """Return currently available Neo AI image generation models."""
+    neo = NeoAIClient()
+    try:
+        models = await neo.list_models()
+    except Exception as exc:
+        raise HTTPException(status_code=502, detail=f"获取 Neo AI 模型列表失败: {exc}") from exc
+
+    return {
+        "default_model": settings.neodomain_default_model,
+        "models": models,
+    }
 
 
 @router.post("/tasks", response_model=TaskCreateResponse)
@@ -274,19 +290,13 @@ async def continue_render(task_id: str, background_tasks: BackgroundTasks):
     if dirty_assets.get("hero") and not hero_path:
         clear_front_split_assets(task_id)
 
-    # Update status before starting
-    from app.core.pipeline import _write_status
-    _write_status(task_id, "rendering", {
-        "phase": "rendering",
-        "completed_steps": ["vision_analysis", "prompt_generation", "neo_ai_generation", "front_split", "fill_plan"],
-        "current_step": "rendering_variants",
-        "detail": {
-            "rerender_scope": {
-                "hero_changed": bool(dirty_assets.get("hero")),
-                "texture_ids": target_texture_ids,
-            },
-        },
-    })
+    _set_rerender_state(
+        task_id,
+        "running",
+        texture_ids=target_texture_ids,
+        hero_changed=bool(dirty_assets.get("hero")),
+        current_step="rendering_variants",
+    )
 
     background_tasks.add_task(
         run_pipeline,
@@ -304,8 +314,8 @@ async def continue_render(task_id: str, background_tasks: BackgroundTasks):
 
     return {
         "task_id": task_id,
-        "status": "rendering",
-        "message": "已开始渲染，所有资产已就绪",
+        "rerender_status": "running",
+        "message": "已开始重新渲染现存纹理",
         "rerender_scope": {
             "hero_changed": bool(dirty_assets.get("hero")),
             "texture_ids": target_texture_ids,

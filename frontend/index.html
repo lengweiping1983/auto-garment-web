@@ -430,7 +430,8 @@
         }
 
         .status-pending,
-        .ref-status-pending {
+        .ref-status-pending,
+        .ref-status-deleted {
             background: rgba(233, 195, 94, 0.16);
             color: #f5d78b;
         }
@@ -971,9 +972,11 @@
                     <textarea id="userPrompt" rows="5" placeholder="例如：水彩花卉、童话森林、轻户外机能"></textarea>
                 </div>
 
-                <div class="form-group hidden">
-                    <label for="neoModel">生图模型（可选）</label>
-                    <input type="text" id="neoModel" placeholder="gemini-3-pro-image-preview">
+                <div class="form-group">
+                    <label for="neoModel">生图模型</label>
+                    <select id="neoModel">
+                        <option value="gemini-2.5-flash-image">gemini-2.5-flash-image</option>
+                    </select>
                 </div>
 
                 <div class="form-group hidden">
@@ -1136,6 +1139,7 @@
         let selectedTaskId = null;
         let pollInterval = null;
         let lastPolledStatus = null;
+        let lastRerenderStatus = null;
         let lightboxAssetType = null;
         let selectedReferenceType = null;
 
@@ -1149,6 +1153,15 @@
                 failed: '失败',
                 waiting_assets: '待补图',
             }[status] || '空闲';
+        }
+
+        function getRerenderStatus(progress) {
+            const detail = (progress && progress.detail) || {};
+            return detail.rerender_status || '';
+        }
+
+        function isRerenderRunning(progress) {
+            return getRerenderStatus(progress) === 'running';
         }
 
         function updateWorkspaceHero(taskLabel, phase, hint) {
@@ -1204,6 +1217,148 @@
             }
         });
 
+        const DEFAULT_NEO_MODEL = 'gemini-2.5-flash-image';
+        const MODEL_SORT_ORDER = [
+            'gemini-2.5-flash-image',
+            'gemini-3.1-flash-image-preview',
+            'gemini-3-pro-image-preview',
+            'wan2.7-image',
+            'wan2.7-image-pro',
+            'doubao-seedream-5-0-260128',
+            'doubao-seedream-4-5-251128',
+            'doubao-seedream-4-0-250828',
+            'gpt-image-1.5',
+            'Midjourney-v 7',
+            'Midjourney-niji 7',
+        ];
+        const FALLBACK_NEO_MODELS = [
+            {
+                model_name: 'gemini-2.5-flash-image',
+                model_display_name: 'Nano Banana',
+                model_description: 'Google 图像生成模型，支持文生图和图生图',
+                supported_sizes: ['1K'],
+                points_cost_per_image: 30,
+            },
+            {
+                model_name: 'gemini-3-pro-image-preview',
+                model_display_name: 'Nano Banana Pro',
+                model_description: 'Google 图像生成模型，支持文生图和图生图',
+                supported_sizes: ['2K', '4K'],
+                points_cost_per_image: 100,
+            },
+            {
+                model_name: 'gemini-3.1-flash-image-preview',
+                model_display_name: 'Nano Banana 2',
+                model_description: 'Google 图像生成模型，支持文生图和图生图',
+                supported_sizes: ['1K', '2K', '4K'],
+                points_cost_per_image: 90,
+            },
+            {
+                model_name: 'wan2.7-image-pro',
+                model_display_name: 'Wan 2.7 Image Pro',
+                model_description: '万相 2.7 image 专业版',
+                supported_sizes: ['1K', '2K'],
+                points_cost_per_image: 60,
+            },
+            {
+                model_name: 'doubao-seedream-4-5-251128',
+                model_display_name: 'Seedream 4.5',
+                model_description: 'Seedream 最新图像生成模型',
+                supported_sizes: ['2K', '4K'],
+                points_cost_per_image: 30,
+            },
+            {
+                model_name: 'gpt-image-1.5',
+                model_display_name: 'GPT Image 1.5',
+                model_description: 'GPT Image 1.5 图像生成模型',
+                supported_sizes: ['1K'],
+                points_cost_per_image: 100,
+            },
+            {
+                model_name: 'doubao-seedream-5-0-260128',
+                model_display_name: 'Seedream 5.0',
+                model_description: 'Seedream 最新图像生成模型',
+                supported_sizes: ['2K', '3K'],
+                points_cost_per_image: 25,
+            },
+            {
+                model_name: 'wan2.7-image',
+                model_display_name: 'Wan 2.7 Image',
+                model_description: '万相 2.7 image，生成速度更快',
+                supported_sizes: ['1K', '2K'],
+                points_cost_per_image: 25,
+            },
+            {
+                model_name: 'doubao-seedream-4-0-250828',
+                model_display_name: 'Seedream 4.0',
+                model_description: 'Seedream 图像生成模型',
+                supported_sizes: ['2K', '4K'],
+                points_cost_per_image: 25,
+            },
+            {
+                model_name: 'Midjourney-niji 7',
+                model_display_name: 'Midjourney-niji 7',
+                model_description: 'Midjourney Niji V7',
+                supported_sizes: ['1K'],
+                points_cost_per_image: 30,
+            },
+            {
+                model_name: 'Midjourney-v 7',
+                model_display_name: 'Midjourney-v7',
+                model_description: 'Midjourney AI 图像生成模型',
+                supported_sizes: ['1K'],
+                points_cost_per_image: 30,
+            },
+        ];
+
+        function sortNeoModels(models) {
+            return [...models].sort((a, b) => {
+                const aIdx = MODEL_SORT_ORDER.indexOf(a.model_name);
+                const bIdx = MODEL_SORT_ORDER.indexOf(b.model_name);
+                const aRank = aIdx === -1 ? MODEL_SORT_ORDER.length : aIdx;
+                const bRank = bIdx === -1 ? MODEL_SORT_ORDER.length : bIdx;
+                if (aRank !== bRank) return aRank - bRank;
+                return (a.model_name || '').localeCompare(b.model_name || '');
+            });
+        }
+
+        function renderNeoModelOptions(models, defaultModel = DEFAULT_NEO_MODEL) {
+            const select = document.getElementById('neoModel');
+            if (!select) return;
+            const normalized = Array.isArray(models) && models.length ? models : FALLBACK_NEO_MODELS;
+            const filtered = normalized.filter(model =>
+                Array.isArray(model.supported_sizes) && model.supported_sizes.includes('2K')
+            );
+            const displayModels = sortNeoModels(filtered.length ? filtered : normalized);
+            select.innerHTML = '';
+
+            for (const model of displayModels) {
+                const option = document.createElement('option');
+                option.value = model.model_name;
+                option.textContent = model.model_name;
+                option.title = model.model_description || model.model_name;
+                select.appendChild(option);
+            }
+
+            const desired = displayModels.some(model => model.model_name === defaultModel)
+                ? defaultModel
+                : (displayModels[0] && displayModels[0].model_name) || DEFAULT_NEO_MODEL;
+            select.value = desired;
+        }
+
+        async function loadNeoModels() {
+            try {
+                const res = await fetch(apiUrl('/api/v1/neo_models'));
+                const data = await res.json();
+                if (!res.ok) throw new Error(data.detail || '加载模型列表失败');
+                renderNeoModelOptions(data.models, data.default_model || DEFAULT_NEO_MODEL);
+            } catch (err) {
+                console.warn('Neo 模型列表加载失败，使用内置回退列表:', err);
+                renderNeoModelOptions(FALLBACK_NEO_MODELS, DEFAULT_NEO_MODEL);
+            }
+        }
+
+        loadNeoModels();
         loadTasks();
 
         const uploadArea = document.getElementById('uploadArea');
@@ -1317,10 +1472,10 @@
                     document.getElementById('referenceImagesCard').classList.remove('hidden');
                     updateProgress(data);
                     updateReferenceImages(taskId, data.progress, data.status);
-                    if (data.status === 'completed') {
+                    if (data.status === 'completed' && !isRerenderRunning(data.progress)) {
                         setDownloadEnabled(false);
                         showResults();
-                    } else if (data.status === 'pending' || data.status === 'analyzing' || data.status === 'generating' || data.status === 'rendering' || data.status === 'waiting_assets') {
+                    } else if (data.status === 'pending' || data.status === 'analyzing' || data.status === 'generating' || data.status === 'rendering' || data.status === 'waiting_assets' || isRerenderRunning(data.progress)) {
                         setDownloadEnabled(false);
                         document.getElementById('previewGrid').innerHTML = '<div class="empty-state">任务处理中，预览图会在完成后自动刷新。</div>';
                         document.getElementById('piecesGrid').innerHTML = '<div class="empty-state">任务处理中，裁片缩略图会在完成后自动刷新。</div>';
@@ -1374,7 +1529,7 @@
                 document.getElementById('imagePreview').innerHTML = '';
                 document.getElementById('garmentType').selectedIndex = 0;
                 document.getElementById('userPrompt').value = '';
-                document.getElementById('neoModel').value = '';
+                document.getElementById('neoModel').value = DEFAULT_NEO_MODEL;
                 document.getElementById('neoSize').value = '';
                 btn.disabled = false;
                 btn.textContent = '开始生成';
@@ -1428,6 +1583,7 @@
         function startPolling() {
             if (pollInterval) clearInterval(pollInterval);
             lastPolledStatus = null;
+            lastRerenderStatus = null;
             pollInterval = setInterval(pollStatus, 3000);
             pollStatus();
         }
@@ -1437,18 +1593,20 @@
             try {
                 const res = await fetch(apiUrl(`/api/v1/tasks/${currentTaskId}`));
                 const data = await res.json();
+                const rerenderStatus = getRerenderStatus(data.progress);
                 updateProgress(data);
                 updateReferenceImages(currentTaskId, data.progress, data.status);
-                if (lastPolledStatus !== data.status) {
+                if (lastPolledStatus !== data.status || lastRerenderStatus !== rerenderStatus) {
                     lastPolledStatus = data.status;
+                    lastRerenderStatus = rerenderStatus;
                     loadTasks();
                 }
-                if (data.status === 'completed') {
+                if (data.status === 'completed' && rerenderStatus !== 'running') {
                     clearInterval(pollInterval);
                     pollInterval = null;
                     setDownloadEnabled(false);
                     showResults();
-                } else if (data.status === 'failed') {
+                } else if (data.status === 'failed' || rerenderStatus === 'failed') {
                     clearInterval(pollInterval);
                     pollInterval = null;
                 }
@@ -1517,6 +1675,7 @@
         function isReferenceDeletable(type) {
             if (!['hero', 'texture_1', 'texture_2', 'texture_3'].includes(type)) return false;
             if (isRunningStatus(lastPolledStatus || '')) return false;
+            if (lastRerenderStatus === 'running') return false;
             const { img } = getReferenceElements(type);
             return !!(img && img.src);
         }
@@ -1565,8 +1724,8 @@
                 placeholder.classList.add('upload-trigger');
             }
             if (statusEl) {
-                statusEl.textContent = '等待上传';
-                statusEl.className = 'ref-status ref-status-pending';
+                statusEl.textContent = '已删除';
+                statusEl.className = 'ref-status ref-status-deleted';
             }
             if (item) {
                 item.setAttribute('data-can-replace', 'true');
@@ -1628,7 +1787,7 @@
             }
 
             const isWaitingAssets = globalStatus === 'waiting_assets';
-            const canReplace = !isRunningStatus(globalStatus);
+            const canReplace = !isRunningStatus(globalStatus) && lastRerenderStatus !== 'running';
             if (item) {
                 item.setAttribute('data-can-replace', canReplace ? 'true' : 'false');
             }
@@ -1646,6 +1805,7 @@
                 running: '生成中',
                 uploading: '上传中',
                 completed: '已完成',
+                deleted: '已删除',
                 failed: '失败',
             }[st] || st;
             statusEl.className = 'ref-status ref-status-' + st;
@@ -1692,6 +1852,19 @@
                     item.setAttribute('data-can-preview', 'false');
                     item.classList.remove('is-selectable');
                 }
+            } else if (st === 'deleted') {
+                placeholder.style.display = 'flex';
+                placeholder.title = '';
+                placeholder.textContent = canReplace ? '点击上传' : '已删除';
+                img.style.display = 'none';
+                if (imgWrap) imgWrap.style.display = 'none';
+                img.src = '';
+                if (imgWrap) imgWrap.classList.remove('is-clickable');
+                if (item) {
+                    item.setAttribute('data-can-preview', 'false');
+                    item.classList.remove('is-selectable');
+                }
+                if (selectedReferenceType === type) setSelectedReference(null);
             } else {
                 placeholder.style.display = 'flex';
                 placeholder.title = '';
@@ -1793,12 +1966,15 @@
         function updateProgress(data) {
             const phases = ['pending', 'analyzing', 'generating', 'rendering', 'completed'];
             const phase = data.status;
+            const rerenderStatus = getRerenderStatus(data.progress);
             const idx = phases.indexOf(phase);
             let pct = phase === 'failed' ? 0 : Math.min(100, Math.max(5, (idx / 4) * 100));
 
             const currentStep = (data.progress && data.progress.current_step) || '';
             let statusText = '';
-            if (phase === 'waiting_assets') {
+            if (rerenderStatus === 'running' && phase === 'completed') {
+                statusText = '已完成（重新渲染中...）';
+            } else if (phase === 'waiting_assets') {
                 statusText = '等待上传资源...';
                 pct = 40;
             } else if (phase === 'generating' && currentStep.startsWith('uploading')) {
@@ -2000,9 +2176,10 @@
                 return statusEl && statusEl.classList.contains('ref-status-completed');
             }).length;
             const globalStatus = lastPolledStatus || '';
+            const rerenderRunning = lastRerenderStatus === 'running';
 
             // Only the manual "continue/re-render" flow should expose a rendering button state.
-            if (Date.now() < manualRenderingUntil) {
+            if (Date.now() < manualRenderingUntil || rerenderRunning) {
                 btn.classList.remove('hidden');
                 btn.textContent = '渲染中...';
                 btn.disabled = true;
@@ -2029,6 +2206,7 @@
                 document.getElementById('progressCard').classList.remove('hidden');
                 document.getElementById('resultsCard').style.display = 'grid';
                 startPolling();
+                lastRerenderStatus = data.rerender_status || 'running';
                 // Ensure button state refreshes after grace period even if polling stopped
                 setTimeout(() => checkAllAssetsReady(), 3500);
             } catch (err) {

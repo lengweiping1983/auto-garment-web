@@ -262,7 +262,7 @@ async def delete_hero_motif(task_id: str):
             if path.exists():
                 path.unlink()
 
-    _update_detail_field(task_id, "hero_motif", {"status": "pending", "path": ""})
+    _update_detail_field(task_id, "hero_motif", {"status": "deleted", "path": "", "error": ""})
     mark_dirty_assets(task_id, hero=True)
     return {"ok": True, "deleted": True}
 
@@ -299,7 +299,7 @@ async def delete_texture(task_id: str, texture_id: str):
     if path.exists():
         path.unlink()
 
-    _update_detail_field(task_id, texture_id, {"status": "pending", "path": ""})
+    _update_detail_field(task_id, texture_id, {"status": "deleted", "path": "", "error": ""})
     mark_dirty_assets(task_id, textures=[texture_id])
     return {"ok": True, "deleted": True}
 

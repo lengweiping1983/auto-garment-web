@@ -107,6 +107,57 @@ def _update_detail_field(task_id: str, key: str, value: dict):
     path.write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
 
 
+def _merge_detail_patch(task_id: str, detail_patch: dict) -> dict:
+    """Merge a partial patch into progress.detail without changing task status."""
+    path = _status_path(task_id)
+    if path.exists():
+        try:
+            data = json.loads(path.read_text(encoding="utf-8"))
+        except Exception:
+            data = {}
+    else:
+        data = {}
+
+    progress = data.get("progress") or {}
+    detail = progress.get("detail") or {}
+    for key, value in detail_patch.items():
+        if isinstance(detail.get(key), dict) and isinstance(value, dict):
+            detail[key] = {**detail[key], **value}
+        else:
+            detail[key] = value
+    progress["detail"] = detail
+    data["progress"] = progress
+    data["task_id"] = task_id
+    data["updated_at"] = datetime.now().isoformat()
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
+    return data
+
+
+def _set_rerender_state(
+    task_id: str,
+    status: str,
+    *,
+    texture_ids: list[str] | None = None,
+    hero_changed: bool | None = None,
+    current_step: str | None = None,
+) -> dict:
+    """Track rerender progress in detail without mutating the main task status."""
+    detail_patch: dict = {
+        "rerender_status": status,
+    }
+    if current_step is not None:
+        detail_patch["rerender_current_step"] = current_step
+    scope_patch = {}
+    if texture_ids is not None:
+        scope_patch["texture_ids"] = texture_ids
+    if hero_changed is not None:
+        scope_patch["hero_changed"] = hero_changed
+    if scope_patch:
+        detail_patch["rerender_scope"] = scope_patch
+    return _merge_detail_patch(task_id, detail_patch)
+
+
 def read_task_status(task_id: str) -> dict:
     path = _status_path(task_id)
     if path.exists():
@@ -659,9 +710,26 @@ async def run_pipeline(
     work_dir.mkdir(parents=True, exist_ok=True)
     render_mode, render_runtime = _resolve_render_mode()
     serial_rendering = render_mode == "serial"
+    original_status = read_task_status(task_id).get("status", "unknown")
+    preserve_main_status = force_render and original_status == "completed"
 
     try:
-        _write_status(task_id, "pending", user_prompt=user_prompt)
+        def _write_pipeline_status(status: str, progress: dict | None = None, error: str | None = None):
+            if preserve_main_status:
+                rerender_state = "failed" if status == "failed" else ("completed" if status == "completed" else "running")
+                current_step = (progress or {}).get("current_step")
+                _set_rerender_state(task_id, rerender_state, current_step=current_step)
+                if progress and progress.get("detail"):
+                    _merge_detail_patch(task_id, progress.get("detail") or {})
+                if error is not None:
+                    _write_status(task_id, original_status, error=error)
+                return
+            _write_status(task_id, status, progress=progress, error=error, user_prompt=user_prompt if status == "pending" else None)
+
+        if preserve_main_status:
+            _set_rerender_state(task_id, "running", current_step="rerender_setup")
+        else:
+            _write_status(task_id, "pending", user_prompt=user_prompt)
 
         # Phase 0: Template resolution (always run, lightweight)
         template = resolve_template(garment_type)
@@ -765,9 +833,9 @@ async def run_pipeline(
         # Phase 1: Vision analysis
         visual = _resume_visual()
         if visual:
-            _write_status(task_id, "analyzing", {"phase": "vision_analysis", "completed_steps": [], "current_step": "vision_analysis (resumed)"})
+            _write_pipeline_status("analyzing", {"phase": "vision_analysis", "completed_steps": [], "current_step": "vision_analysis (resumed)"})
         else:
-            _write_status(task_id, "analyzing", {"phase": "vision_analysis", "completed_steps": [], "current_step": "vision_analysis"})
+            _write_pipeline_status("analyzing", {"phase": "vision_analysis", "completed_steps": [], "current_step": "vision_analysis"})
             vision = VisionService()
             visual = await vision.analyze_theme_image(
                 theme_image_path,
@@ -781,12 +849,12 @@ async def run_pipeline(
         prompt_map = _resume_prompt_map()
         texture_prompts = _resume_texture_prompts()
         if prompt_map:
-            _write_status(task_id, "analyzing", {"phase": "prompt_generation", "completed_steps": ["vision_analysis"], "current_step": "prompt_generation (resumed)"})
+            _write_pipeline_status("analyzing", {"phase": "prompt_generation", "completed_steps": ["vision_analysis"], "current_step": "prompt_generation (resumed)"})
             if not texture_prompts:
                 _, texture_prompts = generate_texture_prompts(visual, work_dir, hero_prompt_scheme=hero_prompt_scheme)
                 save_texture_prompts(texture_prompts, work_dir)
         else:
-            _write_status(task_id, "analyzing", {"phase": "prompt_generation", "completed_steps": ["vision_analysis"], "current_step": "prompt_generation"})
+            _write_pipeline_status("analyzing", {"phase": "prompt_generation", "completed_steps": ["vision_analysis"], "current_step": "prompt_generation"})
             prompt_map, texture_prompts = generate_texture_prompts(visual, work_dir, hero_prompt_scheme=hero_prompt_scheme)
             save_texture_prompts(texture_prompts, work_dir)
             prompt_dir = work_dir / "generated_texture_prompts"
@@ -826,20 +894,23 @@ async def run_pipeline(
 
         # Determine what needs generation
         needs_hero = hero_path is None and not allow_missing_hero
-        texture_ids = ["texture_1", "texture_2", "texture_3"]
-        needs_textures = [tid for tid in texture_ids if tid not in texture_paths]
+        all_texture_ids = ["texture_1", "texture_2", "texture_3"]
+        expected_texture_ids = [tid for tid in (force_render_texture_ids or []) if tid in all_texture_ids] if force_render else list(all_texture_ids)
+        if not expected_texture_ids:
+            expected_texture_ids = list(texture_paths.keys()) or list(all_texture_ids)
+        needs_textures = [tid for tid in expected_texture_ids if tid not in texture_paths]
         # Test mode: wait for manual uploads if assets are missing
         if settings.skip_ai_generation and (needs_hero or needs_textures):
-            _write_status(task_id, "waiting_assets", {
+            _write_pipeline_status("waiting_assets", {
                     "phase": "waiting_assets",
                     "completed_steps": ["vision_analysis", "prompt_generation"],
                     "current_step": "waiting_for_manual_uploads",
                     "detail": {
                         "reference_image": {"status": "completed"},
-                    "hero_motif": {"status": "pending" if needs_hero or (allow_missing_hero and not hero_path) else "completed"},
-                    "texture_1": {"status": "pending" if "texture_1" not in texture_paths else "completed"},
-                    "texture_2": {"status": "pending" if "texture_2" not in texture_paths else "completed"},
-                    "texture_3": {"status": "pending" if "texture_3" not in texture_paths else "completed"},
+                    "hero_motif": {"status": "pending" if needs_hero else ("deleted" if not hero_path else "completed")},
+                    "texture_1": {"status": "pending" if "texture_1" in needs_textures else ("deleted" if force_render and "texture_1" not in expected_texture_ids else "completed")},
+                    "texture_2": {"status": "pending" if "texture_2" in needs_textures else ("deleted" if force_render and "texture_2" not in expected_texture_ids else "completed")},
+                    "texture_3": {"status": "pending" if "texture_3" in needs_textures else ("deleted" if force_render and "texture_3" not in expected_texture_ids else "completed")},
                 },
             })
             while needs_hero or needs_textures:
@@ -847,10 +918,11 @@ async def run_pipeline(
                 hero_path = _resume_hero_path()
                 texture_paths = _resume_texture_paths()
                 needs_hero = hero_path is None and not allow_missing_hero
-                needs_textures = [tid for tid in texture_ids if tid not in texture_paths]
-                _update_detail_field(task_id, "hero_motif", {"status": "pending" if needs_hero or (allow_missing_hero and not hero_path) else "completed", "path": str(hero_path) if hero_path else ""})
-                for tid in texture_ids:
-                    _update_detail_field(task_id, tid, {"status": "pending" if tid in needs_textures else "completed", "path": str(texture_paths.get(tid, ""))})
+                needs_textures = [tid for tid in expected_texture_ids if tid not in texture_paths]
+                _update_detail_field(task_id, "hero_motif", {"status": "pending" if needs_hero else ("deleted" if not hero_path else "completed"), "path": str(hero_path) if hero_path else ""})
+                for tid in all_texture_ids:
+                    texture_status = "pending" if tid in needs_textures else ("deleted" if force_render and tid not in expected_texture_ids else "completed")
+                    _update_detail_field(task_id, tid, {"status": texture_status, "path": str(texture_paths.get(tid, ""))})
 
         # If everything already exists, skip generation and run standard Phase 4-6
         if not needs_hero and not needs_textures:
@@ -889,7 +961,7 @@ async def run_pipeline(
                 _write_json(fill_plan_path, fill_plan)
 
             # Phase 6: Render variants
-            _write_status(task_id, "rendering", {
+            _write_pipeline_status("rendering", {
                 "phase": "rendering",
                 "completed_steps": ["vision_analysis", "prompt_generation", "neo_ai_generation", "front_split", "fill_plan"],
                 "current_step": "rendering_variants",
@@ -999,18 +1071,22 @@ async def run_pipeline(
                 if root_plan.exists():
                     shutil.copy2(root_plan, work_dir / "piece_fill_plan.json")
 
-            _write_status(task_id, "completed", {
+            completed_detail = {
+                "render_runtime": render_runtime,
+                "reference_image": {"status": "completed"},
+                "hero_motif": {"status": ("completed" if hero_path else "deleted"), "path": str(hero_path) if hero_path else ""},
+                "texture_1": {"status": "completed" if "texture_1" in texture_paths else "deleted", "path": str(texture_paths.get("texture_1", ""))},
+                "texture_2": {"status": "completed" if "texture_2" in texture_paths else "deleted", "path": str(texture_paths.get("texture_2", ""))},
+                "texture_3": {"status": "completed" if "texture_3" in texture_paths else "deleted", "path": str(texture_paths.get("texture_3", ""))},
+            }
+            if preserve_main_status:
+                completed_detail["rerender_status"] = "completed"
+                completed_detail["rerender_current_step"] = "completed"
+            _write_pipeline_status("completed", {
                 "phase": "completed",
                 "completed_steps": ["vision_analysis", "prompt_generation", "neo_ai_generation", "front_split", "fill_plan", "rendering"],
                 "current_step": "completed",
-                "detail": {
-                    "render_runtime": render_runtime,
-                    "reference_image": {"status": "completed"},
-                    "hero_motif": {"status": ("completed" if hero_path else ("pending" if allow_missing_hero else "failed")), "path": str(hero_path) if hero_path else ""},
-                    "texture_1": {"status": "completed", "path": str(texture_paths.get("texture_1", ""))},
-                    "texture_2": {"status": "completed", "path": str(texture_paths.get("texture_2", ""))},
-                    "texture_3": {"status": "completed", "path": str(texture_paths.get("texture_3", ""))},
-                },
+                "detail": completed_detail,
             })
             clear_dirty_assets(task_id, all_assets=True)
             return
@@ -1117,7 +1193,7 @@ async def run_pipeline(
                             processed_variants.add(tid)
 
                 # Update status after each task completion
-                _write_status(task_id, "generating", {
+                _write_pipeline_status("generating", {
                     "phase": "neo_ai_generation",
                 "completed_steps": ["vision_analysis", "prompt_generation"],
                 "current_step": "generating_textures",
@@ -1125,7 +1201,7 @@ async def run_pipeline(
                     "render_runtime": render_runtime,
                     "reference_image": {"status": "completed", "url": ref_url},
                         "hero_motif": {
-                            "status": "failed" if (not hero_path and hero_retried and not allow_missing_hero) else ("completed" if hero_path else ("pending" if allow_missing_hero else "running")),
+                            "status": "failed" if (not hero_path and hero_retried and not allow_missing_hero) else ("completed" if hero_path else ("deleted" if allow_missing_hero else "running")),
                             "path": str(hero_path) if hero_path else "",
                             "error": hero_error if (not hero_path and hero_error) else "",
                         },
@@ -1263,26 +1339,30 @@ async def run_pipeline(
             if root_plan.exists():
                 shutil.copy2(root_plan, work_dir / "piece_fill_plan.json")
 
-        _write_status(task_id, "completed", {
+        completed_detail = {
+            "render_runtime": render_runtime,
+            "reference_image": {"status": "completed"},
+            "hero_motif": {
+                "status": ("completed" if hero_path else ("deleted" if allow_missing_hero else "failed")),
+                "path": str(hero_path) if hero_path else "",
+                "error": hero_error if (not hero_path and hero_error) else "",
+            },
+            "texture_1": {"status": "completed" if "texture_1" in texture_paths else "failed", "path": str(texture_paths.get("texture_1", "")), "error": texture_errors.get("texture_1", "")},
+            "texture_2": {"status": "completed" if "texture_2" in texture_paths else "failed", "path": str(texture_paths.get("texture_2", "")), "error": texture_errors.get("texture_2", "")},
+            "texture_3": {"status": "completed" if "texture_3" in texture_paths else "failed", "path": str(texture_paths.get("texture_3", "")), "error": texture_errors.get("texture_3", "")},
+        }
+        if preserve_main_status:
+            completed_detail["rerender_status"] = "completed"
+            completed_detail["rerender_current_step"] = "completed"
+        _write_pipeline_status("completed", {
             "phase": "completed",
             "completed_steps": ["vision_analysis", "prompt_generation", "neo_ai_generation", "front_split", "fill_plan", "rendering"],
             "current_step": "completed",
-            "detail": {
-                "render_runtime": render_runtime,
-                "reference_image": {"status": "completed"},
-                "hero_motif": {
-                    "status": ("completed" if hero_path else ("pending" if allow_missing_hero else "failed")),
-                    "path": str(hero_path) if hero_path else "",
-                    "error": hero_error if (not hero_path and hero_error) else "",
-                },
-                "texture_1": {"status": "completed" if "texture_1" in texture_paths else "failed", "path": str(texture_paths.get("texture_1", "")), "error": texture_errors.get("texture_1", "")},
-                "texture_2": {"status": "completed" if "texture_2" in texture_paths else "failed", "path": str(texture_paths.get("texture_2", "")), "error": texture_errors.get("texture_2", "")},
-                "texture_3": {"status": "completed" if "texture_3" in texture_paths else "failed", "path": str(texture_paths.get("texture_3", "")), "error": texture_errors.get("texture_3", "")},
-            },
+            "detail": completed_detail,
         })
         clear_dirty_assets(task_id, all_assets=True)
 
     except Exception as exc:
         import traceback
-        _write_status(task_id, "failed", error=f"{exc}\n{traceback.format_exc()}")
+        _write_pipeline_status("failed", error=f"{exc}\n{traceback.format_exc()}")
         raise

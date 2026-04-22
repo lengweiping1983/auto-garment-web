@@ -21,7 +21,7 @@ def test_hero_prompt_default_is_scheme_b(tmp_path: Path) -> None:
             "hero_motif_1": "centered subject, transparent PNG cutout, real alpha background, no background, clean silhouette",
             "texture_1": "seamless repeat floral pattern",
             "texture_2": "coordinated seamless dots",
-            "texture_3": "tiny accent pattern",
+            "texture_3": "small accent pattern",
         }
     }
 
@@ -43,7 +43,7 @@ def test_hero_prompt_scheme_a_keeps_pure_white_background(tmp_path: Path) -> Non
             "hero_motif_1": "centered subject, transparent PNG cutout, real alpha background, no background, clean silhouette",
             "texture_1": "seamless repeat floral pattern",
             "texture_2": "coordinated seamless dots",
-            "texture_3": "tiny accent pattern",
+            "texture_3": "small accent pattern",
         }
     }
 
@@ -88,7 +88,7 @@ def test_hero_prompt_scheme_b_uses_white_background_and_keeps_a_textures(tmp_pat
             "hero_motif_1": "centered complete subject, pure white background, clean crisp edges",
             "texture_1": "seamless repeat floral pattern",
             "texture_2": "coordinated seamless dots",
-            "texture_3": "tiny accent pattern",
+            "texture_3": "small accent pattern",
         },
     }
 
@@ -135,7 +135,7 @@ def test_scheme_b_ignores_legacy_hero_edge_contract_when_building_white_hero(tmp
             "hero_motif_1": "transparent PNG cutout bird, real alpha background, no background",
             "texture_1": "seamless repeat floral pattern",
             "texture_2": "coordinated seamless dots",
-            "texture_3": "tiny accent pattern",
+            "texture_3": "small accent pattern",
         },
     }
 

@@ -146,7 +146,7 @@ IMAGE_SAFE_PHRASE_REPLACEMENTS = (
     (r"\bswimsuit\b", "retro swimwear"),
     (r"\bbeach\b", "coastal"),
     (r"\bsurfboard\s+silhouettes?\b", "board-shaped motifs"),
-    (r"\bsilhouettes?\b", "simplified shapes"),
+    (r"\bsilhouettes?\b", "simple shapes "),
     (r"\bcommercial\s+apparel\s+textile\b", "apparel-safe textile design"),
     (r"\bcommercial\s+garment\s+print\b", "apparel-safe print graphic"),
     (r"\bpin-?up\b", "retro poster-inspired"),

@@ -34,7 +34,7 @@ HERO_NEGATIVE_EN = (
 PANEL_DEFAULTS_EN = {
     "hero_motif_1": "foreground hero motif only, centered complete subject, preserve and recreate the primary subject from the user's reference image as much as possible, keep the recognizable silhouette, color identity, pose, proportions, and key visual details, full head and hair visible, full uncropped figure, pure white background, no shadow, no floor, no scenery, no background art, no extra objects, clean crisp edges, apparel placement graphic, apparel-safe print graphic, no text",
     "texture_1": "seamless tileable visible repeat pattern with concrete small botanical or geometric motifs on pale ground, stable low-to-medium density, clearly repeatable elements, commercial apparel base fabric, no abstract wash, no plain texture, no paper grain only, no gradient, no empty background, no tonal atmosphere only, no blurred background, no scene, no landscape, no text",
-    "texture_2": "seamless tileable coordinating visible repeat pattern with concrete small motifs, lattice, linework, leaves, dots, or controlled geometric elements, stable repeat structure on light ground, same palette, no abstract wash, no plain texture, no paper grain only, no gradient, no empty background, no tonal atmosphere only, no scene, no text",
-    "texture_3": "tiny scattered small-scale pattern on light ground, controlled density, no text"
+    "texture_2": "seamless tileable coordinating visible repeat pattern with concrete small motifs, lattice, linework, leaves, dots, or controlled geometric elements, stable repeat structure on light background, same palette, no abstract wash, no plain texture, no paper grain only, no gradient, no empty background, no tonal atmosphere only, no scene, no text",
+    "texture_3": "small scattered small repeat on light background, moderate density, no text"
 }
 

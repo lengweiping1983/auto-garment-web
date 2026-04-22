@@ -1,4 +1,4 @@
-"""Create front-left/front-right motif assets from the primary white-background image."""
+"""Create front-left/front-right motif assets from transparent or AI-generated light-background hero images."""
 import json
 from collections import deque
 from pathlib import Path
@@ -6,22 +6,25 @@ from pathlib import Path
 from PIL import Image, ImageChops, ImageFilter, ImageOps
 
 
-WHITE_MIN = 235
-WHITE_SPREAD_MAX = 18
-WHITE_DISTANCE_MAX = 42
+BG_BRIGHTNESS_MIN = 208
+BG_SPREAD_MAX = 40
+BG_DISTANCE_MAX = 54
 MIN_SUBJECT_AREA_RATIO = 0.03
 MIN_INTERNAL_BG_AREA_RATIO = 0.00012
+ALPHA_TRANSPARENCY_RATIO_MIN = 0.002
 
 
-def _is_white_background_pixel(pixel: tuple[int, int, int], palette: list[tuple[int, int, int]]) -> bool:
+def _is_background_candidate(pixel: tuple[int, int, int]) -> bool:
+    return min(pixel) >= BG_BRIGHTNESS_MIN and max(pixel) - min(pixel) <= BG_SPREAD_MAX
+
+
+def _is_background_pixel(pixel: tuple[int, int, int], palette: list[tuple[int, int, int]]) -> bool:
     r, g, b = pixel
-    if min(pixel) < WHITE_MIN:
-        return False
-    if max(pixel) - min(pixel) > WHITE_SPREAD_MAX:
+    if not _is_background_candidate(pixel):
         return False
     if not palette:
         return True
-    return any(abs(r - pr) + abs(g - pg) + abs(b - pb) <= WHITE_DISTANCE_MAX for pr, pg, pb in palette)
+    return any(abs(r - pr) + abs(g - pg) + abs(b - pb) <= BG_DISTANCE_MAX for pr, pg, pb in palette)
 
 
 def _edge_pixels(rgb: Image.Image) -> list[tuple[int, int, int]]:
@@ -39,7 +42,7 @@ def _edge_pixels(rgb: Image.Image) -> list[tuple[int, int, int]]:
 
 
 def _edge_background_palette(rgb: Image.Image) -> list[tuple[int, int, int]]:
-    samples = [c for c in _edge_pixels(rgb) if min(c) >= WHITE_MIN and max(c) - min(c) <= WHITE_SPREAD_MAX]
+    samples = [c for c in _edge_pixels(rgb) if _is_background_candidate(c)]
     if not samples:
         return []
     counts: dict[tuple[int, int, int], int] = {}
@@ -51,7 +54,15 @@ def _edge_background_palette(rgb: Image.Image) -> list[tuple[int, int, int]]:
     return [color for color, count in ranked[:6] if count / total >= 0.03]
 
 
-def _extract_white_background_mask(rgb: Image.Image) -> Image.Image:
+def _background_matte_color(rgb: Image.Image) -> tuple[int, int, int]:
+    palette = _edge_background_palette(rgb)
+    if palette:
+        channels = list(zip(*palette))
+        return tuple(round(sum(channel) / len(channel)) for channel in channels)
+    return (255, 255, 255)
+
+
+def _extract_background_mask(rgb: Image.Image) -> Image.Image:
     w, h = rgb.size
     palette = _edge_background_palette(rgb)
     pixels = rgb.load()
@@ -72,7 +83,7 @@ def _extract_white_background_mask(rgb: Image.Image) -> Image.Image:
         seen[idx] = 1
         x = idx % w
         y = idx // w
-        if not _is_white_background_pixel(pixels[x, y], palette):
+        if not _is_background_pixel(pixels[x, y], palette):
             continue
         mask_px[x, y] = 255
         if x > 0:
@@ -86,10 +97,10 @@ def _extract_white_background_mask(rgb: Image.Image) -> Image.Image:
     return mask
 
 
-def _fill_enclosed_white_holes(rgb: Image.Image, bg_mask: Image.Image) -> Image.Image:
-    """Promote enclosed white islands to background.
+def _fill_enclosed_background_holes(rgb: Image.Image, bg_mask: Image.Image) -> Image.Image:
+    """Promote enclosed light background islands to background.
 
-    This catches white pockets trapped between subject parts, such as the area
+    This catches background-colored pockets trapped between subject parts, such as the area
     between a hand-held prop and the body, that edge flood-fill cannot reach.
     """
     w, h = rgb.size
@@ -104,7 +115,7 @@ def _fill_enclosed_white_holes(rgb: Image.Image, bg_mask: Image.Image) -> Image.
             idx = y * w + x
             if seen[idx] or bg_px[x, y] > 0:
                 continue
-            if not _is_white_background_pixel(pixels[x, y], palette):
+            if not _is_background_pixel(pixels[x, y], palette):
                 continue
 
             queue: deque[tuple[int, int]] = deque([(x, y)])
@@ -119,7 +130,7 @@ def _fill_enclosed_white_holes(rgb: Image.Image, bg_mask: Image.Image) -> Image.
                 seen[cidx] = 1
                 if bg_px[cx, cy] > 0:
                     continue
-                if not _is_white_background_pixel(pixels[cx, cy], palette):
+                if not _is_background_pixel(pixels[cx, cy], palette):
                     continue
 
                 component.append((cx, cy))
@@ -137,37 +148,50 @@ def _fill_enclosed_white_holes(rgb: Image.Image, bg_mask: Image.Image) -> Image.
 
             if touches_border or len(component) < min_area:
                 continue
+            boundary_total = 0
+            boundary_bg_like = 0
+            component_set = set(component)
+            for cx, cy in component:
+                for nx, ny in ((cx - 1, cy), (cx + 1, cy), (cx, cy - 1), (cx, cy + 1)):
+                    if nx < 0 or ny < 0 or nx >= w or ny >= h or (nx, ny) in component_set:
+                        continue
+                    boundary_total += 1
+                    if bg_px[nx, ny] > 0 or _is_background_pixel(pixels[nx, ny], palette):
+                        boundary_bg_like += 1
+            if boundary_total and boundary_bg_like / boundary_total < 0.58:
+                continue
             for cx, cy in component:
                 bg_px[cx, cy] = 255
 
     return bg_mask
 
 
-def _foreground_mask_from_white_bg(img: Image.Image) -> Image.Image:
+def _foreground_mask_from_light_bg(img: Image.Image) -> Image.Image:
     rgb = img.convert("RGB")
-    bg_mask = _extract_white_background_mask(rgb)
-    bg_mask = _fill_enclosed_white_holes(rgb, bg_mask)
+    bg_mask = _extract_background_mask(rgb)
+    bg_mask = _fill_enclosed_background_holes(rgb, bg_mask)
     subject = ImageOps.invert(bg_mask)
     # Keep this cleanup deliberately light. Aggressive max/min morphology tends
     # to seal narrow background gaps around fingers and props, leaving visible
-    # white pockets in the final overlay.
+    # light-background pockets in the final overlay.
     subject = subject.filter(ImageFilter.MedianFilter(size=3))
     subject = subject.point(lambda value: 255 if value >= 18 else 0)
     return subject
 
 
-def _decontaminate_white_matte(rgba: Image.Image) -> Image.Image:
-    """Remove white matte spill from semi-transparent edge pixels."""
+def _decontaminate_matte(rgba: Image.Image, matte_rgb: tuple[int, int, int]) -> Image.Image:
+    """Remove light matte spill from semi-transparent edge pixels."""
     out = rgba.convert("RGBA")
     px = out.load()
+    bg_r, bg_g, bg_b = matte_rgb
     for y in range(out.height):
         for x in range(out.width):
             r, g, b, a = px[x, y]
             if a <= 0 or a >= 255:
                 continue
-            nr = max(0, min(255, round(255 * (r - 255 + a) / a)))
-            ng = max(0, min(255, round(255 * (g - 255 + a) / a)))
-            nb = max(0, min(255, round(255 * (b - 255 + a) / a)))
+            nr = max(0, min(255, round((255 * r - bg_r * (255 - a)) / a)))
+            ng = max(0, min(255, round((255 * g - bg_g * (255 - a)) / a)))
+            nb = max(0, min(255, round((255 * b - bg_b * (255 - a)) / a)))
             px[x, y] = (nr, ng, nb, a)
     return out
 
@@ -226,6 +250,33 @@ def _alpha_bbox(alpha: Image.Image) -> tuple[int, int, int, int] | None:
     return bbox
 
 
+def _has_meaningful_transparency(img: Image.Image) -> bool:
+    rgba = img.convert("RGBA")
+    alpha = rgba.getchannel("A")
+    bbox = _alpha_bbox(alpha)
+    if not bbox:
+        return False
+
+    histogram = alpha.histogram()
+    transparent = sum(histogram[:7])
+    if transparent <= 0:
+        return False
+
+    total = max(1, rgba.width * rgba.height)
+    if transparent / total < ALPHA_TRANSPARENCY_RATIO_MIN:
+        return False
+
+    return bbox != (0, 0, rgba.width, rgba.height)
+
+
+def _soften_existing_alpha(alpha: Image.Image) -> tuple[Image.Image, Image.Image]:
+    hard_mask = alpha.point(lambda value: 255 if value >= 20 else 0)
+    soft_alpha = alpha.filter(ImageFilter.GaussianBlur(radius=0.8))
+    soft_alpha = ImageChops.lighter(soft_alpha, hard_mask)
+    soft_alpha = soft_alpha.point(lambda value: 0 if value <= 6 else min(255, int(value * 1.03)))
+    return hard_mask, soft_alpha
+
+
 def _coarse_bbox_from_background_diff(img: Image.Image) -> tuple[int, int, int, int] | None:
     rgb = img.convert("RGB")
     bg = _edge_background_palette(rgb)
@@ -236,7 +287,7 @@ def _coarse_bbox_from_background_diff(img: Image.Image) -> tuple[int, int, int, 
     xs, ys = [], []
     for y in range(h):
         for x in range(w):
-            if not _is_white_background_pixel(pixels[x, y], bg):
+            if not _is_background_pixel(pixels[x, y], bg):
                 xs.append(x)
                 ys.append(y)
     if not xs:
@@ -250,7 +301,21 @@ def _coarse_bbox_from_background_diff(img: Image.Image) -> tuple[int, int, int, 
 
 def _build_soft_subject_rgba(img: Image.Image) -> tuple[Image.Image, Image.Image, Image.Image]:
     rgba = img.convert("RGBA")
-    coarse_mask = _foreground_mask_from_white_bg(rgba)
+    matte_rgb = _background_matte_color(rgba.convert("RGB"))
+
+    if _has_meaningful_transparency(rgba):
+        hard_mask, alpha = _soften_existing_alpha(rgba.getchannel("A"))
+        bbox = _alpha_bbox(alpha)
+        if bbox:
+            out = rgba.copy()
+            out.putalpha(alpha)
+            out = _decontaminate_matte(out, matte_rgb)
+            out = _suppress_border_white_fringe(out)
+            overlay = Image.new("RGBA", rgba.size, (255, 255, 255, 0))
+            overlay.paste((255, 0, 0, 96), mask=hard_mask)
+            return out, alpha, overlay
+
+    coarse_mask = _foreground_mask_from_light_bg(rgba)
     bbox = _alpha_bbox(coarse_mask)
     if not bbox:
         bbox = _coarse_bbox_from_background_diff(rgba)
@@ -280,7 +345,7 @@ def _build_soft_subject_rgba(img: Image.Image) -> tuple[Image.Image, Image.Image
 
     out = rgba.copy()
     out.putalpha(alpha)
-    out = _decontaminate_white_matte(out)
+    out = _decontaminate_matte(out, matte_rgb)
     out = _suppress_border_white_fringe(out)
     overlay = Image.new("RGBA", rgba.size, (255, 255, 255, 0))
     overlay.paste((255, 0, 0, 96), mask=hard_mask)

@@ -22,7 +22,7 @@ class Settings(BaseSettings):
     # Neo AI
     neodomain_base_url: str = "https://story.neodomain.cn/agent/ai-image-generation"
     neodomain_access_token: str = ""
-    neodomain_default_model: str = "gemini-2.5-flash-image"
+    neodomain_default_model: str = "gemini-3.1-flash-image-preview"
     neodomain_default_size: str = "2K"
 
     # Test mode: skip AI generation and wait for manual uploads

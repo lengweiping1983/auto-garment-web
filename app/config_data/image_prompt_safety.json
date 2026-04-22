@@ -172,7 +172,7 @@
     },
     {
       "pattern": "\\bsilhouettes?\\b",
-      "replacement": "simplified shapes",
+      "replacement": "simple shapes ",
       "reason": "弱化可能被误解的人体轮廓表达"
     },
     {

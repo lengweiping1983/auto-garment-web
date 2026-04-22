@@ -207,6 +207,15 @@ def ensure_thumbnail(
     return generate_thumbnail(original_path, thumb_path, max_size=max_size)
 
 
+def delete_thumbnail(original_path: Path, task_dir: Path) -> bool:
+    """Delete cached thumbnail for an original image if present."""
+    thumb_path = get_thumbnail_path(task_dir, original_path)
+    if thumb_path.exists():
+        thumb_path.unlink()
+        return True
+    return False
+
+
 def _thumb_size_for_role(role: str) -> tuple[int, int]:
     if role in ("preview", "front_pair_check", "preview_white"):
         return THUMB_SIZES["preview"]

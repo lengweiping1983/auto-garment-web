@@ -11,7 +11,7 @@ from fastapi.responses import FileResponse, StreamingResponse
 
 from app.config import settings
 from app.core.pipeline import mark_dirty_assets
-from app.core.image_utils import ensure_thumbnail, _thumb_size_for_role
+from app.core.image_utils import delete_thumbnail, ensure_thumbnail, _thumb_size_for_role
 from app.models.schemas import AutomationSummary
 
 try:
@@ -236,6 +236,10 @@ async def upload_hero_motif(task_id: str, file: UploadFile = File(...)):
     dest = hero_dir / f"hero_motif{suffix}"
     data = await file.read()
     dest.write_bytes(data)
+    try:
+        await asyncio.to_thread(ensure_thumbnail, dest, task_dir, _thumb_size_for_role("hero"))
+    except Exception as e:
+        print(f"[WARN] Hero thumbnail generation failed for {dest}: {e}")
     _update_detail_field(task_id, "hero_motif", {"status": "completed", "path": str(dest.resolve())})
     mark_dirty_assets(task_id, hero=True)
     return {"ok": True, "path": str(dest.resolve())}
@@ -252,6 +256,7 @@ async def delete_hero_motif(task_id: str):
     if hero_dir.exists():
         for f in hero_dir.iterdir():
             if f.is_file() and f.suffix.lower() in {".png", ".jpg", ".jpeg", ".webp"}:
+                delete_thumbnail(f, task_dir)
                 f.unlink()
 
     # Clear derived front-split assets so rerender cannot reuse stale hero-based motifs.
@@ -280,6 +285,10 @@ async def upload_texture(task_id: str, texture_id: str, file: UploadFile = File(
     data = await file.read()
     dest = texture_dir / f"{texture_id}.png"
     dest.write_bytes(data)
+    try:
+        await asyncio.to_thread(ensure_thumbnail, dest, task_dir, _thumb_size_for_role("texture"))
+    except Exception as e:
+        print(f"[WARN] Texture thumbnail generation failed for {dest}: {e}")
     _update_detail_field(task_id, texture_id, {"status": "completed", "path": str(dest.resolve())})
     mark_dirty_assets(task_id, textures=[texture_id])
     return {"ok": True, "path": str(dest.resolve())}
@@ -297,6 +306,7 @@ async def delete_texture(task_id: str, texture_id: str):
 
     path = task_dir / "neo_textures" / f"{texture_id}.png"
     if path.exists():
+        delete_thumbnail(path, task_dir)
         path.unlink()
 
     _update_detail_field(task_id, texture_id, {"status": "deleted", "path": "", "error": ""})

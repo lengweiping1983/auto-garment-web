@@ -1138,7 +1138,7 @@
                 <div class="form-group">
                     <label>主题图</label>
                     <div class="upload-area" id="uploadArea">
-                        <p>拖拽图片到这里，或点击上传一张参考图</p>
+                        <p>拖拽图片到这里，或点击上传/粘贴一张参考图</p>
                         <input type="file" id="themeImage" accept="image/*" style="display:none">
                         <div id="imagePreview"></div>
                     </div>
@@ -2080,8 +2080,12 @@
                 if (res.ok) {
                     document.getElementById('progressCard').classList.remove('hidden');
                     document.getElementById('referenceImagesCard').classList.remove('hidden');
+                    lastPolledStatus = data.status;
+                    lastRerenderStatus = getRerenderStatus(data.progress);
                     updateProgress(data);
                     updateReferenceImages(taskId, data.progress, data.status);
+                    // Ensure button state is correct after switching to a completed task
+                    setTimeout(() => checkAllAssetsReady(), 100);
                     if (data.status === 'completed' && !isRerenderRunning(data.progress)) {
                         setDownloadEnabled(false);
                         showResults();
@@ -2328,7 +2332,7 @@
             }
             if (placeholder) {
                 placeholder.style.display = 'flex';
-                placeholder.textContent = '点击上传';
+                placeholder.textContent = '点击上传或粘贴';
                 placeholder.classList.remove('uploading');
                 placeholder.classList.add('upload-trigger');
             }
@@ -2464,7 +2468,7 @@
             } else if (st === 'deleted') {
                 placeholder.style.display = 'flex';
                 placeholder.title = '';
-                placeholder.textContent = canReplace ? '点击上传' : '已删除';
+                placeholder.textContent = canReplace ? '点击上传或粘贴' : '已删除';
                 img.style.display = 'none';
                 if (imgWrap) imgWrap.style.display = 'none';
                 img.src = '';
@@ -2480,9 +2484,9 @@
                 if (st === 'running') {
                     placeholder.textContent = '生成中...';
                 } else if (canReplace && st === 'pending') {
-                    placeholder.textContent = '点击上传';
+                    placeholder.textContent = '点击上传或粘贴';
                 } else if (isWaitingAssets) {
-                    placeholder.textContent = '点击上传';
+                    placeholder.textContent = '点击上传或粘贴';
                 } else {
                     placeholder.textContent = '等待生成...';
                 }
@@ -2795,7 +2799,7 @@
                 return;
             }
 
-            const canShow = readyTextureCount > 0 && (assetsModified || globalStatus === 'waiting_assets');
+            const canShow = readyTextureCount > 0 && (assetsModified || globalStatus === 'waiting_assets' || globalStatus === 'completed');
             btn.classList.toggle('hidden', !canShow);
             btn.textContent = '重新渲染';
             btn.disabled = false;
@@ -2803,6 +2807,9 @@
 
         async function continueRender() {
             if (!currentTaskId) return;
+            if (!confirm('重新渲染将清空之前的渲染结果，是否继续？')) {
+                return;
+            }
             const btn = document.getElementById('continueRenderBtn');
             btn.disabled = true;
             btn.textContent = '渲染中...';

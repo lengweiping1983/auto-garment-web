@@ -57,7 +57,7 @@ VISION_SYSTEM_PROMPT_B = """
 - `texture_2`
 - `texture_3`
 
-4. 所有 prompt 都必须是**最终英文正向 prompt 字符串**，不是中文说明，不要写 `prompt:`、`here is`、`for generation` 之类元话术。
+4. 所有 prompt 都必须是**英文 正向 prompt 字符串**，不是中文说明，不要写 `prompt:`、`here is`、`for generation` 之类元话术。
 
 ## 输出 JSON schema（至少遵守以下结构）
 
@@ -109,9 +109,9 @@ VISION_SYSTEM_PROMPT_B = """
     "fusion_rule": "主图和纹理必须像同一套设计，不像两张图片拼贴"
   },
   "single_texture_derivation": {
-    "texture_1": "从参考图提炼主面料的背景色、笔触和小型 repeat 元素",
-    "texture_2": "从参考图提炼辅面料的协调小元素、线条或格纹结构",
-    "texture_3": "从参考图提炼轻量点缀元素，小尺度 repeat",
+    "texture_1": "必须从参考图提炼(风格、形态、颜色、背景），需要你 设计 或 复刻 repeat 元素 生成 衣服面料图案，不能有任何主体，(texture_1，texture_2，texture_3 三者不能相同，不能相似，需要有明显的变化）",
+    "texture_2": "必须从参考图提炼(风格、形态、颜色、背景），需要你 设计 或 复刻 repeat 元素 生成 衣服面料图案，不能有任何主体，(texture_1，texture_2，texture_3 三者不能相同，不能相似，需要有明显的变化）",
+    "texture_3": "必须从参考图提炼(风格、形态、颜色、背景），需要你 设计 或 复刻 repeat 元素 生成 衣服面料图案，不能有任何主体，(texture_1，texture_2，texture_3 三者不能相同，不能相似，需要有明显的变化）",
     "forbidden_full_body_elements": ["不得进入满版纹理的完整主体/场景/文字/logo"]
   },
   "texture_micro_structure": {
@@ -162,9 +162,9 @@ VISION_SYSTEM_PROMPT_B = """
   },
   "generated_prompts": {
     "hero_motif_1": "英文 white-background foreground hero motif prompt。结构要求：先写主体观察段（覆盖 identity/pose/expression/hair/clothing/props/accessories/composition/art_style_details 全部9维），再接白底定位图格式约束。必须：1) preserve and recreate the primary subject from reference image；2) complete uncropped subject, full head and hair visible；3) pure white solid background；4) clean crisp edges with no halo / no colored fringe；5) no shadow, no floor, no scenery, no garden, no foliage, no painted wash, no vignette；6) apparel placement graphic, apparel-safe print graphic",
-    "texture_1": "英文 正向 prompt，直接可用于图像生成。必须从参考图提炼(风格，颜色，背景），设计 或 复刻 repeat 元素 生成 衣服面料图案，不能有任何主体，(texture_1，texture_2，texture_3 三者不能相同，不能相似，需要有明显的变化），只描述纯图案本身，不要解释过程，不要写中文，不要写任何元说明。必须写成英文 seamless tileable visible repeat pattern prompt，并明确写出具体小元素名称，如 botanical / geometric / line / dot。必须包含 motif_scale_relative、density_estimate、negative_space_ratio 三项，且要落到数值：elements are 3-8% of tile width，12-20 elements per tile，45-55% breathing room。element_type_mix 应偏向 botanical 0.6 / geometric_dot 0.3 / organic_line 0.1。禁止写成 abstract wash、plain texture、paper grain only、gradient、empty background、tonal atmosphere only、blurred background、scene、landscape。",
-    "texture_2": "英文 正向 prompt，直接可用于图像生成。必须从参考图提炼(风格，颜色，背景），设计 或 复刻 repeat 元素 生成 衣服面料图案，不能有任何主体，(texture_1，texture_2，texture_3 三者不能相同，不能相似，需要有明显的变化），只描述纯图案本身，不要解释过程，不要写中文，不要写任何元说明。必须写成英文 seamless tileable visible repeat pattern prompt，明确写出协调 repeat 结构，如 lattice / linework / leaves / dots / geometric。必须包含 motif_scale_relative、density_estimate、negative_space_ratio 三项，且要落到数值：elements are 2-6% of tile width，15-25 elements per tile，50-60% breathing room。element_type_mix 应偏向 botanical 0.4 / geometric 0.4 / organic_line 0.2。禁止写成 abstract wash、plain texture、paper grain only、gradient、empty background、tonal atmosphere only、blurred background、scene、landscape。",
-    "texture_3": "英文 正向 prompt，直接可用于图像生成。必须从参考图提炼(风格，颜色，背景），设计 或 复刻 repeat 元素 生成 衣服面料图案，不能有任何主体，(texture_1，texture_2，texture_3 三者不能相同，不能相似，需要有明显的变化），只描述纯图案本身，不要解释过程，不要写中文，不要写任何元说明。必须写成英文 small repeat pattern prompt，强调极小规模元素、高密度点缀但负空间充足。必须包含 motif_scale_relative、density_estimate、negative_space_ratio 三项，且要落到数值：elements are 1-4% of tile width，20-40 elements per tile，60-75% breathing room。element_type_mix 应偏向 botanical 0.3 / geometric_dot 0.5 / organic_line 0.2。"
+    "texture_1": "英文 正向 prompt，直接可用于图像生成。必须从参考图提炼(风格、形态、颜色、背景），需要你 设计 或 复刻 repeat 元素 生成 衣服面料图案，不能有任何主体，(texture_1，texture_2，texture_3 三者不能相同，不能相似，需要有明显的变化），只描述纯图案本身，不要解释过程，不要写中文，不要写任何元说明。必须写成英文 seamless tileable visible repeat pattern prompt，明确写出具体小元素名称，如 botanical / geometric / line / dot。必须包含 motif_scale_relative、density_estimate、negative_space_ratio 三项，且要落到数值：elements are 3-8% of tile width，12-20 elements per tile，45-55% breathing room。element_type_mix 应偏向 botanical 0.6 / geometric_dot 0.3 / organic_line 0.1。禁止写成 abstract wash、plain texture、paper grain only、gradient、empty background、tonal atmosphere only、blurred background、scene、landscape。",
+    "texture_2": "英文 正向 prompt，直接可用于图像生成。必须从参考图提炼(风格、形态、颜色、背景），需要你 设计 或 复刻 repeat 元素 生成 衣服面料图案，不能有任何主体，(texture_1，texture_2，texture_3 三者不能相同，不能相似，需要有明显的变化），只描述纯图案本身，不要解释过程，不要写中文，不要写任何元说明。必须写成英文 seamless tileable visible repeat pattern prompt，明确写出 repeat 结构，如 lattice / linework / leaves / dots / geometric。必须包含 motif_scale_relative、density_estimate、negative_space_ratio 三项，且要落到数值：elements are 2-6% of tile width，15-25 elements per tile，50-60% breathing room。element_type_mix 应偏向 botanical 0.4 / geometric 0.4 / organic_line 0.2。禁止写成 abstract wash、plain texture、paper grain only、gradient、empty background、tonal atmosphere only、blurred background、scene、landscape。",
+    "texture_3": "英文 正向 prompt，直接可用于图像生成。必须从参考图提炼(风格、形态、颜色、背景），需要你 设计 或 复刻 repeat 元素 生成 衣服面料图案，不能有任何主体，(texture_1，texture_2，texture_3 三者不能相同，不能相似，需要有明显的变化），只描述纯图案本身，不要解释过程，不要写中文，不要写任何元说明。必须写成英文 small repeat pattern prompt，强调极小规模元素、高密度点缀但负空间充足。必须包含 motif_scale_relative、density_estimate、negative_space_ratio 三项，且要落到数值：elements are 1-4% of tile width，20-40 elements per tile，60-75% breathing room。element_type_mix 应偏向 botanical 0.3 / geometric_dot 0.5 / organic_line 0.2。禁止写成 abstract wash、plain texture、paper grain only、gradient、empty background、tonal atmosphere only、blurred background、scene、landscape。"
   }
 }
 ```
@@ -206,7 +206,7 @@ VISION_SYSTEM_PROMPT_B = """
 
 8. `generated_prompts`
    - 只生成英文 `hero_motif_1`、`texture_1`、`texture_2`、`texture_3` 四条提示词。
-   - `texture_1/2/3` 保持当前 Web 项目用途：三条纯图案平铺纹理。
+   - `texture_1/2/3` 三条纯图案平铺纹理。
    - `hero_motif_1` 必须是前景主体白底图。
 
 ## hero_motif_1 特别要求

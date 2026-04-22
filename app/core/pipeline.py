@@ -15,7 +15,7 @@ import copy
 import json
 import os
 import shutil
-from datetime import datetime
+from datetime import datetime, timedelta
 from pathlib import Path
 
 from app.config import settings
@@ -29,7 +29,7 @@ from app.services.front_split_service import create_front_split_assets, inject_f
 from app.services.fill_plan_service import build_fill_plan
 from app.services.prompt_engine import generate_texture_prompts, save_texture_prompts
 from app.services.hero_prompt_strategy_base import validate_hero_prompt_scheme
-from app.services.template_service import resolve_template
+from app.services.template_service import resolve_template, normalize_template_payloads
 from app.services.vision_service import VisionService
 
 
@@ -161,8 +161,73 @@ def _set_rerender_state(
 def read_task_status(task_id: str) -> dict:
     path = _status_path(task_id)
     if path.exists():
-        return json.loads(path.read_text(encoding="utf-8"))
+        data = json.loads(path.read_text(encoding="utf-8"))
+        if _heal_stale_rerender_state(path, data):
+            try:
+                data = json.loads(path.read_text(encoding="utf-8"))
+            except Exception:
+                pass
+        return data
     return {"task_id": task_id, "status": "unknown", "error": "Task not found"}
+
+
+def _heal_stale_rerender_state(status_path: Path, data: dict) -> bool:
+    """Recover tasks whose rerender state stayed on running after work stopped."""
+    if data.get("status") != "completed":
+        return False
+    progress = data.get("progress") or {}
+    detail = progress.get("detail") or {}
+    if detail.get("rerender_status") != "running":
+        return False
+
+    rerender_scope = detail.get("rerender_scope") or {}
+    target_texture_ids = [
+        tid for tid in rerender_scope.get("texture_ids", [])
+        if isinstance(tid, str) and tid
+    ]
+
+    updated_at_raw = data.get("updated_at")
+    is_old_enough = False
+    if updated_at_raw:
+        try:
+            updated_at = datetime.fromisoformat(updated_at_raw)
+            is_old_enough = datetime.now() - updated_at >= timedelta(minutes=2)
+        except ValueError:
+            pass
+
+    task_dir = status_path.parent
+    summary_path = task_dir / "automation_summary.json"
+    if not summary_path.exists():
+        return False
+
+    try:
+        summary = json.loads(summary_path.read_text(encoding="utf-8"))
+    except Exception:
+        return False
+
+    preview_path = summary.get("预览图", "")
+    has_preview = bool(preview_path and Path(preview_path).exists())
+    variant_summaries = summary.get("裁片模板变体") or []
+    rendered_variant_ids = {
+        str(item.get("纹理ID"))
+        for item in variant_summaries
+        if item.get("纹理ID") and Path(item.get("预览图", "")).exists()
+    }
+    has_variant_outputs = bool(rendered_variant_ids)
+    target_outputs_ready = bool(target_texture_ids) and all(tid in rendered_variant_ids for tid in target_texture_ids)
+    if not (has_preview or has_variant_outputs):
+        return False
+    if not (is_old_enough or target_outputs_ready):
+        return False
+
+    detail["rerender_status"] = "completed"
+    detail["rerender_current_step"] = "completed"
+    progress["detail"] = detail
+    progress["current_step"] = progress.get("current_step") or "completed"
+    data["progress"] = progress
+    data["updated_at"] = datetime.now().isoformat()
+    status_path.write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
+    return True
 
 
 # ---------------------------------------------------------------------------
@@ -759,6 +824,7 @@ async def run_pipeline(
             raise RuntimeError(f"未能通过 garment_type='{garment_type}' 命中内置模板。仅支持 T恤 与 防晒服。")
         pieces_payload = json.loads(Path(template["pieces_path"]).read_text(encoding="utf-8"))
         garment_map = json.loads(Path(template["garment_map_path"]).read_text(encoding="utf-8"))
+        pieces_payload, garment_map, template_orientation_issues = normalize_template_payloads(pieces_payload, garment_map)
         template_dir = Path(template["template_dir"])
 
         # Normalize mask paths to absolute
@@ -766,6 +832,8 @@ async def run_pipeline(
             mp = piece.get("mask_path", "")
             if mp and not Path(mp).is_absolute():
                 piece["mask_path"] = str((template_dir / mp).resolve())
+        if template_orientation_issues:
+            print(f"[TEMPLATE] Normalized orientation metadata for {len(template_orientation_issues)} fields from template compatibility rules")
 
         # --- Resume helpers ---
         def _resume_visual() -> dict | None:

@@ -305,7 +305,21 @@ def build_rule_plan(pieces_payload: dict, texture_set: dict, garment_map: dict) 
             "zone": zone,
             "symmetry_group": symmetry_group,
             "same_shape_group": same_shape_group,
-            "base": make_layer("texture", "统一纹理填充", texture_id=t1_id, scale=piece_scale, rotation=0, offset_x=params["offset_x"], offset_y=params["offset_y"]),
+            "texture_flow": map_item.get("texture_flow", ""),
+            "pair_alignment_mode": map_item.get("pair_alignment_mode", ""),
+            "piece_upright_rotation": map_item.get("piece_upright_rotation", piece.get("piece_upright_rotation", 0)),
+            "orientation_source": map_item.get("orientation_source", piece.get("orientation_source", "")),
+            "base": make_layer(
+                "texture",
+                "统一纹理填充",
+                texture_id=t1_id,
+                scale=piece_scale,
+                rotation=0,
+                offset_x=params["offset_x"],
+                offset_y=params["offset_y"],
+                texture_direction=map_item.get("texture_direction", piece.get("texture_direction", "")),
+                texture_flow=map_item.get("texture_flow", piece.get("texture_flow", "")),
+            ),
             "overlay": None,
             "trim": None,
             "reason": "所有裁片使用同一纹理，不做角色区分",
@@ -384,7 +398,7 @@ def restore_pair_metadata(entries: list[dict], garment_map: dict, issues: list[d
         if not gm:
             continue
         changed = []
-        for key in ("zone", "symmetry_group", "same_shape_group"):
+        for key in ("zone", "symmetry_group", "same_shape_group", "texture_flow", "pair_alignment_mode", "piece_upright_rotation", "orientation_source"):
             value = gm.get(key, "")
             if value and entry.get(key) != value:
                 entry[key] = value
@@ -406,6 +420,9 @@ def restore_pair_metadata(entries: list[dict], garment_map: dict, issues: list[d
 
 
 def _is_pair_texture_piece(item: dict) -> bool:
+    pair_alignment_mode = item.get("pair_alignment_mode", "")
+    if pair_alignment_mode and pair_alignment_mode != "independent":
+        return True
     role = item.get("garment_role", "")
     group = item.get("symmetry_group") or item.get("same_shape_group") or ""
     return role in {"front_body", "front_hero", "sleeve_pair", "collar_or_upper_trim", "trim_strip"} or any(token in group for token in ("front", "sleeve", "collar", "trim"))
@@ -419,6 +436,19 @@ def _pair_group_mode(group: str) -> str:
     if "collar" in group:
         return "identical_pair"
     return "pair"
+
+
+def _entry_pair_mode(entry: dict) -> str:
+    mapping = {
+        "front_seam_continuous": "front_seam",
+        "identical_shared_phase": "identical_pair",
+        "independent": "pair",
+    }
+    pair_alignment_mode = entry.get("pair_alignment_mode")
+    if pair_alignment_mode:
+        return mapping.get(str(pair_alignment_mode), "pair")
+    group = str(entry.get("symmetry_group") or entry.get("same_shape_group") or "")
+    return _pair_group_mode(group)
 
 
 def enforce_pair_texture_constraints(entries: list[dict], garment_map: dict, pieces_payload: dict, texture_set: dict, issues: list[dict]) -> None:
@@ -435,7 +465,7 @@ def enforce_pair_texture_constraints(entries: list[dict], garment_map: dict, pie
             continue
         groups.setdefault(group, []).append(entry)
 
-    copy_keys = ("fill_type", "texture_id", "solid_id", "scale", "rotation", "mirror_x", "mirror_y", "texture_direction", "respect_pattern_orientation")
+    copy_keys = ("fill_type", "texture_id", "solid_id", "scale", "rotation", "mirror_x", "mirror_y", "texture_direction", "texture_flow", "respect_pattern_orientation")
     for group, members in groups.items():
         if len(members) < 2:
             continue
@@ -444,7 +474,7 @@ def enforce_pair_texture_constraints(entries: list[dict], garment_map: dict, pie
         master_base = master.get("base")
         if not isinstance(master_base, dict):
             continue
-        mode = _pair_group_mode(group)
+        mode = _entry_pair_mode(master)
         master_piece = by_piece.get(master["piece_id"], {})
         tex_w, tex_h = 512, 512
         for tex in texture_set.get("textures", []):
@@ -547,7 +577,7 @@ def enforce_validation(entries: list[dict], pieces_payload: dict, texture_set: d
             issues.append({"type": "fixed_group_missing_base", "severity": "high", "piece_id": entry["piece_id"], "group": group, "message": "同组成员 base 缺失，已复制 template"})
             continue
         changed = False
-        for key in ("fill_type", "texture_id", "solid_id", "scale", "rotation", "offset_x", "offset_y", "mirror_x", "mirror_y", "texture_direction", "respect_pattern_orientation"):
+        for key in ("fill_type", "texture_id", "solid_id", "scale", "rotation", "offset_x", "offset_y", "mirror_x", "mirror_y", "texture_direction", "texture_flow", "respect_pattern_orientation"):
             if base.get(key) != template.get(key):
                 base[key] = template[key]
                 changed = True

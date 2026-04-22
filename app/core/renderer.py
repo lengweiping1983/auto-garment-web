@@ -97,6 +97,43 @@ def auto_rotation_for_direction(texture: Image.Image, texture_direction: str, pi
     return 0
 
 
+def piece_upright_rotation(piece: dict | None) -> int:
+    if not piece:
+        return 0
+    for key in ("piece_upright_rotation", "pattern_orientation"):
+        try:
+            return int(float(piece.get(key, 0) or 0)) % 360
+        except Exception:
+            continue
+    return 0
+
+
+def resolve_texture_flow(plan: dict, piece: dict | None = None) -> str:
+    value = str(plan.get("texture_flow") or (piece or {}).get("texture_flow") or "").strip()
+    if value:
+        return value
+    direction = str(plan.get("texture_direction") or (piece or {}).get("texture_direction") or "").strip().lower()
+    if direction == "transverse":
+        return "across_piece_upright"
+    return "with_piece_upright"
+
+
+def texture_flow_rotation(texture_flow: str) -> float:
+    mapping = {
+        "with_piece_upright": 0,
+        "against_piece_upright": 180,
+        "across_piece_upright": 90,
+    }
+    return float(mapping.get(str(texture_flow or "").strip(), 0))
+
+
+def should_respect_piece_upright(plan: dict) -> bool:
+    flag = plan.get("respect_pattern_orientation")
+    if flag is None:
+        return True
+    return bool(flag)
+
+
 def transform_texture(texture: Image.Image, plan: dict, piece: dict | None = None) -> Image.Image:
     out = texture.convert("RGBA")
     if plan.get("mirror_x"):
@@ -108,10 +145,14 @@ def transform_texture(texture: Image.Image, plan: dict, piece: dict | None = Non
         out = out.resize((max(1, round(out.width * scale)), max(1, round(out.height * scale))), Image.Resampling.LANCZOS)
     rotation = float(plan.get("rotation", 0) or 0)
     if piece:
-        rotation += auto_rotation_for_direction(out, plan.get("texture_direction", ""), piece)
-        piece_orientation = piece.get("pattern_orientation", 0)
-        if plan.get("respect_pattern_orientation") and piece_orientation:
-            rotation += piece_orientation
+        texture_flow = resolve_texture_flow(plan, piece)
+        if texture_flow:
+            rotation += texture_flow_rotation(texture_flow)
+        else:
+            rotation += auto_rotation_for_direction(out, plan.get("texture_direction", ""), piece)
+        upright_rotation = piece_upright_rotation(piece)
+        if should_respect_piece_upright(plan) and upright_rotation:
+            rotation += upright_rotation
     if abs(rotation % 360) > 0.001:
         out = out.rotate(rotation, expand=True, resample=Image.Resampling.BICUBIC)
     return out
@@ -242,9 +283,9 @@ def render_motif_layer(piece: dict, layer: dict, motif_info: dict) -> Image.Imag
         ratio = min(target_max_w / max(1, motif.width), target_max_h / max(1, motif.height))
     motif = motif.resize((max(1, round(motif.width * ratio)), max(1, round(motif.height * ratio))), Image.Resampling.LANCZOS)
     rotation = float(layer.get("rotation", 0) or 0)
-    piece_orientation = piece.get("pattern_orientation", 0)
-    if piece_orientation:
-        rotation += piece_orientation
+    upright_rotation = piece_upright_rotation(piece)
+    if should_respect_piece_upright(layer) and upright_rotation:
+        rotation += upright_rotation
     if abs(rotation % 360) > 0.001:
         motif = motif.rotate(rotation, expand=True, resample=Image.Resampling.BICUBIC)
     content = Image.new("RGBA", (piece.get("width", 1), piece.get("height", 1)), (0, 0, 0, 0))
@@ -284,7 +325,7 @@ def render_layered_piece(piece: dict, plan: dict, textures: dict, solids: dict, 
         if not texture_info:
             raise RuntimeError(f"裁片 {piece.get('piece_id')} 的面料 {texture_id!r} 不可用或缺失。")
         texture = Image.open(texture_info["path"]).convert("RGBA")
-        texture = transform_texture(texture, plan)
+        texture = transform_texture(texture, plan, piece)
         content = tile_image(texture, (piece.get("width", 1), piece.get("height", 1)), int(plan.get("offset_x", 0) or 0), int(plan.get("offset_y", 0) or 0))
         return apply_mask(content, piece["mask_path"])
     content = Image.new("RGBA", (piece.get("width", 1), piece.get("height", 1)), (0, 0, 0, 0))
@@ -313,10 +354,7 @@ def _mask_image(piece: dict) -> Image.Image:
 
 
 def _front_orientation(piece: dict) -> int:
-    try:
-        return int(float(piece.get("pattern_orientation", 0) or 0)) % 360
-    except Exception:
-        return 0
+    return piece_upright_rotation(piece)
 
 
 def _normalize_front_image(img: Image.Image, orientation: int) -> Image.Image:
@@ -509,7 +547,7 @@ def _load_front_motif(overlay: dict, motifs: dict) -> Image.Image | None:
     return full
 
 
-def _render_front_pair_base(canvas_size: tuple[int, int], base: dict, textures: dict, solids: dict) -> Image.Image:
+def _render_front_pair_base(canvas_size: tuple[int, int], base: dict, textures: dict, solids: dict, piece_meta: dict | None = None) -> Image.Image:
     if not isinstance(base, dict):
         return Image.new("RGBA", canvas_size, (0, 0, 0, 0))
     if base.get("fill_type") == "solid":
@@ -524,7 +562,12 @@ def _render_front_pair_base(canvas_size: tuple[int, int], base: dict, textures: 
     if not texture_info:
         raise RuntimeError(f"左右前片连续纹理 {texture_id!r} 不可用或缺失。")
     texture = Image.open(texture_info["path"]).convert("RGBA")
-    pseudo_piece = {"width": canvas_size[0], "height": canvas_size[1]}
+    pseudo_piece = {
+        "width": canvas_size[0],
+        "height": canvas_size[1],
+        "piece_upright_rotation": 0,
+        "texture_flow": base.get("texture_flow") or (piece_meta or {}).get("texture_flow", ""),
+    }
     texture = transform_texture(texture, base, pseudo_piece)
     return apply_opacity(tile_image(texture, canvas_size, int(base.get("offset_x", 0) or 0), int(base.get("offset_y", 0) or 0)), float(base.get("opacity", 1) or 1))
 
@@ -564,7 +607,7 @@ def render_front_pair(pieces_payload: dict, entries: dict, textures: dict, solid
     left_plan = entries[left_id]
     right_plan = entries[right_id]
     layout = _front_pair_layout(left_piece, right_piece)
-    content = _render_front_pair_base(layout["size"], left_plan.get("base") or right_plan.get("base"), textures, solids)
+    content = _render_front_pair_base(layout["size"], left_plan.get("base") or right_plan.get("base"), textures, solids, left_piece)
     overlay = left_plan.get("overlay") if isinstance(left_plan.get("overlay"), dict) else right_plan.get("overlay")
     if isinstance(overlay, dict) and overlay.get("fill_type") == "motif":
         content.alpha_composite(_render_front_pair_motif(layout["size"], layout, overlay, motifs))

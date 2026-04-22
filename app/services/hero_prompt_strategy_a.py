@@ -136,8 +136,8 @@ VISION_SYSTEM_PROMPT_A = """
     }
   },
   "generated_prompts": {
-    "hero_motif_1": "一个最终英文正向 prompt，长度约100-220词，直接可用于图像生成。基于 struct 中主主体与次主体信息，只描述最终要生成的定位印花主体，不要解释过程，不要写中文，不要写提示语说明。用途是商业上装的白底定位印花（placement print），不是海报、贴纸、包装图或整件服装效果图。必须写入：主体精确类别与数量、整体轮廓与体量、主色/辅色/点缀色及近似 HEX、主体自身材质与表面光学特性、姿态动作朝向、关键纹样与边缘特征。若主体本身可透光或半透明，只能描述主体自身质感，绝不能把背景写成透明。必须原样包含这些短语：isolated foreground subject only, pure white background, no shadow, no floor, no scenery, no extra objects, no text, no logo, no watermark, centered complete subject, full uncropped figure, clean crisp edges, apparel placement graphic, commercial garment print。禁止出现：transparent background, alpha background, PNG cutout, background removal, checkerboard preview, fake transparency grid, sticker cutout, isolated on transparent, seamless, tileable, repeat pattern, all-over print, fabric swatch, wallpaper, packaging paper, garment mockup, fashion model, mannequin, person wearing garment, 3D render。",
-    "texture_1": "一个最终英文正向 prompt，长度约70-120词，直接可用于图像生成。它表示面积最大的主底纹，必须只描述纯图案本身，不要解释过程，不要写中文，不要写任何元说明。用途是商业上装大身面料印花，不是海报、贴纸、场景图、白底单主体图。必须与原图底纹在主题元素、排列方式、密度、色彩比例、线条粗细上高度一致。必须写成无缝平铺的 2D 面料印花，并与 texture_2、texture_3 共享同一色板与同一艺术风格。必须原样包含这些短语：seamless pattern, tileable, all-over print, flat 2D, no shading, no folds, fabric texture, commercial apparel textile。禁止出现：pure white background, isolated foreground subject only, centered complete subject, full uncropped figure, placement graphic, transparent background, alpha background, garment mockup, fashion model, mannequin, person wearing garment, scenery, poster, sticker, product photo。",
+    "hero_motif_1": "一个最终英文正向 prompt，长度约100-220词，直接可用于图像生成。基于 struct 中主主体与次主体信息，只描述最终要生成的定位印花主体，不要解释过程，不要写中文，不要写提示语说明。用途是商业上装的白底定位印花（placement print），不是海报、贴纸、包装图或整件服装效果图。必须写入：主体精确类别与数量、整体轮廓与体量、主色/辅色/点缀色及近似 HEX、主体自身材质与表面光学特性、姿态动作朝向、关键纹样与边缘特征。若主体本身可透光或半透明，只能描述主体自身质感，绝不能把背景写成透明。必须原样包含这些短语：isolated foreground subject only, pure white background, no shadow, no floor, no scenery, no extra objects, no text, no logo, no watermark, centered complete subject, full uncropped figure, clean crisp edges, apparel placement graphic, apparel-safe print graphic。禁止出现：transparent background, alpha background, PNG cutout, background removal, checkerboard preview, fake transparency grid, sticker cutout, isolated on transparent, seamless, tileable, repeat pattern, all-over print, fabric swatch, wallpaper, packaging paper, garment mockup, fashion model, mannequin, person wearing garment, 3D render。",
+    "texture_1": "一个最终英文正向 prompt，长度约70-120词，直接可用于图像生成。它表示面积最大的主底纹，必须只描述纯图案本身，不要解释过程，不要写中文，不要写任何元说明。用途是商业上装大身面料印花，不是海报、贴纸、场景图、白底单主体图。必须与原图底纹在主题元素、排列方式、密度、色彩比例、线条粗细上高度一致。必须写成无缝平铺的 2D 面料印花，并与 texture_2、texture_3 共享同一色板与同一艺术风格。必须原样包含这些短语：seamless pattern, tileable, all-over print, flat 2D, no shading, no folds, fabric texture, apparel-safe textile design。禁止出现：pure white background, isolated foreground subject only, centered complete subject, full uncropped figure, placement graphic, transparent background, alpha background, garment mockup, fashion model, mannequin, person wearing garment, scenery, poster, sticker, product photo。",
     "texture_2": "一个最终英文正向 prompt，长度约60-100词，直接可用于图像生成。它表示与 texture_1 协调的次级图案或辅助纹理，必须只描述纯图案本身，不要解释过程，不要写中文，不要写任何元说明。它与 texture_1 使用完全相同的色彩体系和艺术表现语言，但在元素尺度、疏密、抽象程度上形成层次差异。必须是无缝平铺的 2D 面料图案，不能写成人物、服装效果、白底单主体。必须原样包含这些短语：seamless pattern, tileable, coordinated palette, flat 2D, no shading, fabric texture。禁止出现：pure white background, isolated foreground subject only, centered complete subject, full uncropped figure, placement graphic, transparent background, alpha background, garment mockup, fashion model, mannequin, person wearing garment, scenery, poster, sticker, product photo。",
     "texture_3": "一个最终英文正向 prompt，长度约40-80词，直接可用于图像生成。它表示最小尺度的微装饰纹理，只描述纯图案本身，不要解释过程，不要写中文，不要写任何元说明。它必须与 texture_1、texture_2 保持同一色板和同一艺术风格，但重复单元最小、密度受控、只作为点缀。必须是无缝平铺的 2D 面料图案，不能出现白底主体、模特、穿着效果或场景。必须原样包含这些短语：micro pattern, small-scale repeat, seamless, tileable, flat 2D, accent detail, fabric texture, no shading。禁止出现：pure white background, isolated foreground subject only, centered complete subject, full uncropped figure, placement graphic, transparent background, alpha background, garment mockup, fashion model, mannequin, person wearing garment, scenery, poster, sticker, product photo。"
   }
@@ -185,6 +185,19 @@ VISION_SYSTEM_PROMPT_A = """
    - 若原图信息与商业成衣生成目标冲突，优先服从商业成衣目标：主图输出白底定位主体，纹理输出可平铺纯图案。
    - 输出前先检查一遍：每个 prompt 内不允许同时出现互相冲突的背景、构图、用途词。
 
+9. **主动规避敏感词、违禁词与高风险表达（关键）**
+   - 你生成的 `generated_prompts` 会直接进入生图链路，因此必须主动规避可能触发内容安全审核、供应商 moderation、敏感词过滤、违禁词过滤的表达。
+   - 禁止输出任何涉及：色情/裸露、暴力/血腥、武器、毒品、自残、仇恨、极端主义、虐待、未成年人不当内容、违法行为、NSFW、露骨身体描述。
+   - 即使用户原图或主题中含有高风险联想，也必须改写成**安全、商业、服装可生产**的视觉语言，不能把敏感词原样写进 prompt。
+   - 优先使用安全替代表达，而不是危险原词。例如：
+     - `nude` -> `skin-tone beige`
+     - `blood` -> `deep crimson`
+     - `knife/blade` -> `sharp geometric motif` / `leaf-shaped motif`
+     - `sexy/sensual/provocative` -> `elegant commercial` / `soft elegant` / `bold commercial`
+   - 若某些主体或细节天然高风险，不要直写危险物；改写为抽象图形、颜色、材质、轮廓、 botanical / geometric motif、apparel-safe prop。
+   - negative prompt 也不能堆砌敏感词清单；应尽量使用安全的商业约束词，例如 `apparel-safe`, `no policy-risk content`, `family-friendly design language`, `apparel-safe design language`。
+   - 如果无法在不使用敏感词的情况下准确描述，就优先保留安全的形状、配色、材质、轮廓和构图信息，宁可更抽象，也不要输出危险原词。
+
 ---
 
 ## 自检（输出前默念）
@@ -198,6 +211,7 @@ VISION_SYSTEM_PROMPT_A = """
 - 我补充了**最容易被忽略的3个关键细节**吗？
 - hero_motif_1 是否仍然保持纯白实体背景，没有任何 transparent / cutout / tileable / repeat 冲突词？
 - texture_1/2/3 是否仍然保持纯图案平铺，没有任何 white background / centered subject / mannequin / wearing garment 冲突词？
+- 我是否已经主动规避了敏感词、违禁词和容易触发审核的高风险表达？
 """
 
 

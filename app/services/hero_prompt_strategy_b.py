@@ -180,7 +180,7 @@ VISION_SYSTEM_PROMPT_B = """
     "min_margin_ratio": 0.30,
     "edge_fade_pixels": "2-6px soft anti-aliased edge only",
     "forbidden_alpha_patterns": ["gradient halo", "semi-transparent halo around subject", "colored fringe on edge", "feathered edge wider than 8px"],
-    "required_alpha_behavior": "keep the subject contour clean and readable on a pure white solid background without halo, fringe, or fake transparency artifacts"
+    "required_alpha_behavior": "keep the subject contour clean and readable on a pure white solid background without halo, fringe, or artificial transparency artifacts"
   },
   "hero_texture_fusion_plan": "白底主图与三张纹理如何共享色彩、笔触、边缘处理和元素呼应",
   "source_images": [{"index": 1, "path": "/absolute/path/to/image.png", "role": "primary"}],
@@ -200,8 +200,8 @@ VISION_SYSTEM_PROMPT_B = """
     "hero_violations": []
   },
   "generated_prompts": {
-    "hero_motif_1": "英文 white-background foreground hero motif prompt。结构要求：先写主体观察段（覆盖 identity/pose/expression/hair/clothing/props/accessories/composition/art_style_details 全部9维），再接白底定位图格式约束。必须：1) preserve and recreate the primary subject from reference image；2) complete uncropped subject, full head and hair visible；3) pure white solid background；4) clean crisp edges with no halo / no colored fringe；5) no shadow, no floor, no scenery, no garden, no foliage, no painted wash, no vignette；6) apparel placement graphic, commercial garment print",
-    "texture_1": "一个最终英文正向 prompt，长度约70-120词，直接可用于图像生成。它表示面积最大的主底纹，必须只描述纯图案本身，不要解释过程，不要写中文，不要写任何元说明。用途是商业上装大身面料印花，不是海报、贴纸、场景图、白底单主体图。必须与原图底纹在主题元素、排列方式、密度、色彩比例、线条粗细上高度一致。必须写成无缝平铺的 2D 面料印花，并与 texture_2、texture_3 共享同一色板与同一艺术风格。必须原样包含这些短语：seamless pattern, tileable, all-over print, flat 2D, no shading, no folds, fabric texture, commercial apparel textile。禁止出现：pure white background, isolated foreground subject only, centered complete subject, full uncropped figure, placement graphic, transparent background, alpha background, garment mockup, fashion model, mannequin, person wearing garment, scenery, poster, sticker, product photo。",
+    "hero_motif_1": "英文 white-background foreground hero motif prompt。结构要求：先写主体观察段（覆盖 identity/pose/expression/hair/clothing/props/accessories/composition/art_style_details 全部9维），再接白底定位图格式约束。必须：1) preserve and recreate the primary subject from reference image；2) complete uncropped subject, full head and hair visible；3) pure white solid background；4) clean crisp edges with no halo / no colored fringe；5) no shadow, no floor, no scenery, no garden, no foliage, no painted wash, no vignette；6) apparel placement graphic, apparel-safe print graphic",
+    "texture_1": "一个最终英文正向 prompt，长度约70-120词，直接可用于图像生成。它表示面积最大的主底纹，必须只描述纯图案本身，不要解释过程，不要写中文，不要写任何元说明。用途是商业上装大身面料印花，不是海报、贴纸、场景图、白底单主体图。必须与原图底纹在主题元素、排列方式、密度、色彩比例、线条粗细上高度一致。必须写成无缝平铺的 2D 面料印花，并与 texture_2、texture_3 共享同一色板与同一艺术风格。必须原样包含这些短语：seamless pattern, tileable, all-over print, flat 2D, no shading, no folds, fabric texture, apparel-safe textile design。禁止出现：pure white background, isolated foreground subject only, centered complete subject, full uncropped figure, placement graphic, transparent background, alpha background, garment mockup, fashion model, mannequin, person wearing garment, scenery, poster, sticker, product photo。",
     "texture_2": "一个最终英文正向 prompt，长度约60-100词，直接可用于图像生成。它表示与 texture_1 协调的次级图案或辅助纹理，必须只描述纯图案本身，不要解释过程，不要写中文，不要写任何元说明。它与 texture_1 使用完全相同的色彩体系和艺术表现语言，但在元素尺度、疏密、抽象程度上形成层次差异。必须是无缝平铺的 2D 面料图案，不能写成人物、服装效果、白底单主体。必须原样包含这些短语：seamless pattern, tileable, coordinated palette, flat 2D, no shading, fabric texture。禁止出现：pure white background, isolated foreground subject only, centered complete subject, full uncropped figure, placement graphic, transparent background, alpha background, garment mockup, fashion model, mannequin, person wearing garment, scenery, poster, sticker, product photo。",
     "texture_3": "一个最终英文正向 prompt，长度约40-80词，直接可用于图像生成。它表示最小尺度的微装饰纹理，只描述纯图案本身，不要解释过程，不要写中文，不要写任何元说明。它必须与 texture_1、texture_2 保持同一色板和同一艺术风格，但重复单元最小、密度受控、只作为点缀。必须是无缝平铺的 2D 面料图案，不能出现白底主体、模特、穿着效果或场景。必须原样包含这些短语：micro pattern, small-scale repeat, seamless, tileable, flat 2D, accent detail, fabric texture, no shading。禁止出现：pure white background, isolated foreground subject only, centered complete subject, full uncropped figure, placement graphic, transparent background, alpha background, garment mockup, fashion model, mannequin, person wearing garment, scenery, poster, sticker, product photo。"
   }
@@ -275,7 +275,7 @@ VISION_SYSTEM_PROMPT_B = """
 - `no scenery`
 - `clean crisp edges`
 - `apparel placement graphic`
-- `commercial garment print`
+- `apparel-safe print graphic`
 - `complete uncropped subject`
 - `full head and hair visible`
 - `centered complete subject`
@@ -308,6 +308,17 @@ VISION_SYSTEM_PROMPT_B = """
 - `generated_prompts.texture_1/texture_2/texture_3` 必须是纯平铺纹理，不得出现白底主体、模特、穿着效果、场景。
 - `generated_prompts.hero_motif_1` 必须出现 `pure white background`，且不得出现 `transparent png cutout`、`real alpha background`、`seamless`、`tileable`、`repeat pattern`。
 - 人物、脸、角色、动物、商品、图标、物体都允许作为 `hero_motif_1` 的主体，只要它们是用户参考图的主要内容。
+- 你生成的所有 prompt 都会直接进入生图链路，因此必须主动规避可能触发内容安全审核、敏感词过滤、违禁词过滤、供应商 moderation 的表达。
+- 禁止输出任何涉及：色情/裸露、暴力/血腥、武器、毒品、自残、仇恨、极端主义、虐待、未成年人不当内容、违法行为、NSFW、露骨身体描述。
+- 即使参考图主题中存在高风险联想，也必须改写成**安全、商业、服装可生产**的视觉语言，不能把敏感词原样写进 prompt。
+- 优先使用安全替代表达，而不是危险原词。例如：
+  - `nude` -> `skin-tone beige`
+  - `blood` -> `deep crimson`
+  - `knife/blade` -> `sharp geometric motif` / `leaf-shaped motif`
+  - `sexy/sensual/provocative` -> `elegant commercial` / `soft elegant` / `bold commercial`
+- 若某些主体或细节天然高风险，不要直写危险物；改写为抽象图形、配色、材质、轮廓、 botanical / geometric motif、apparel-safe prop。
+- negative prompt 也不能堆砌敏感词清单；应尽量使用安全的商业约束词，例如 `apparel-safe`, `no policy-risk content`, `family-friendly design language`, `apparel-safe design language`。
+- 如果无法在不使用敏感词的情况下准确描述，就优先保留安全的形状、配色、材质、轮廓和构图信息，宁可更抽象，也不要输出危险原词。
 
 ## 输出前自检
 
@@ -317,6 +328,7 @@ VISION_SYSTEM_PROMPT_B = """
 - `theme_to_piece_strategy.hero_motif` 是否与多主体组合规则一致？
 - `hero_motif_1` 是否仍然是白底图，而不是透明 cutout 或平铺纹理？
 - `texture_1/2/3` 是否仍然保持纯图案平铺，没有 hero 词汇污染？
+- 我是否已经主动规避了敏感词、违禁词和容易触发审核的高风险表达？
 """
 
 
@@ -403,7 +415,7 @@ def _force_white_background_motif_prompt(prompt_text: str) -> str:
     required = (
         "isolated foreground motif only, pure white background, no shadow, no floor, no scenery, "
         "no background art, no extra objects, centered complete subject, full uncropped figure, "
-        "clean crisp edges, apparel placement graphic, commercial garment print"
+        "clean crisp edges, apparel placement graphic, apparel-safe print graphic"
     )
     hero_required = (
         "hero_motif_1 must preserve and recreate the primary subject from the user's reference image as much as possible, "
@@ -452,7 +464,7 @@ def _force_white_background_motif_prompt(prompt_text: str) -> str:
         "pure white background" in lower
         and "clean crisp edges" in lower
         and "apparel placement graphic" in lower
-        and "commercial garment print" in lower
+        and "apparel-safe print graphic" in lower
     ):
         return f"{text}, {hero_required}"
     return f"{text}, {required}, {hero_required}"

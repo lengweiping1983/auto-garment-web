@@ -85,7 +85,7 @@ class NeoAIClient:
             "outputFormat": "png",
             "aspectRatio": "1:1",
             "guidanceScale": 7.5,
-            "safetyTolerance": "10",
+            "safetyTolerance": "6",
             "showPrompt": True,
         }
         if reference_images:

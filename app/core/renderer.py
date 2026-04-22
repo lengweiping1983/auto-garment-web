@@ -10,9 +10,10 @@ Ported from scripts/渲染裁片.py — ALL core logic preserved:
 - compose_preview
 """
 import json
+import hashlib
 from pathlib import Path
 
-from PIL import Image, ImageColor, ImageOps
+from PIL import Image, ImageChops, ImageColor, ImageOps, ImageStat
 
 
 def load_json(path: str | Path) -> dict:
@@ -454,6 +455,14 @@ def _front_pair_ids(pieces_payload: dict, entries: dict) -> tuple[str | None, st
         pid for pid, plan in entries.items()
         if plan.get("front_pair_seam_locked")
         or (isinstance(plan.get("base"), dict) and plan["base"].get("global_front_texture"))
+        or (
+            isinstance(plan.get("pair_texture_constraint"), dict)
+            and plan["pair_texture_constraint"].get("mode") == "front_seam"
+        )
+        or (
+            isinstance(plan.get("base"), dict)
+            and plan["base"].get("pair_texture_constraint") == "front_seam"
+        )
         or (isinstance(plan.get("overlay"), dict) and plan["overlay"].get("global_front_motif"))
         or (isinstance(plan.get("overlay"), dict) and plan["overlay"].get("motif_id") in {"theme_front_full", "theme_front_left", "theme_front_right"})
     ]

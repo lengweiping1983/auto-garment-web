@@ -22,7 +22,7 @@ from app.config import settings
 from app.core.neo_ai_client import NeoAIClient
 from app.core.prompt_sanitizer import prepare_image_generation_payload
 
-from PIL import Image
+from PIL import Image, ImageStat
 from app.core.renderer import render_all, compose_preview
 from app.core.image_utils import generate_thumbnail, _thumb_size_for_role
 from app.services.front_split_service import create_front_split_assets, inject_front_split_motifs
@@ -331,6 +331,21 @@ def _force_fill_plan_to_single_texture(fill_plan: dict, texture_id: str) -> dict
     for piece in plan.get("pieces", []):
         piece_motif_id = piece.get("motif_id") if piece.get("fill_type") == "motif" else None
         is_theme_split = piece_motif_id in {"theme_front_full", "theme_front_left", "theme_front_right"}
+        preserve_front_pair = bool(
+            piece.get("front_pair_seam_locked")
+            or (
+                isinstance(piece.get("pair_texture_constraint"), dict)
+                and piece["pair_texture_constraint"].get("mode") == "front_seam"
+            )
+            or (
+                isinstance(piece.get("base"), dict)
+                and (
+                    piece["base"].get("front_pair_seam_locked")
+                    or piece["base"].get("global_front_texture")
+                    or piece["base"].get("pair_texture_constraint") == "front_seam"
+                )
+            )
+        )
         if piece.get("fill_type") == "motif" and not is_theme_split:
             piece.update(_texture_layer("单纹理模板预览移除定位主图，统一使用当前图案纹理"))
         elif piece.get("fill_type") in {"texture", "solid"} or "texture_id" in piece or "solid_id" in piece:
@@ -351,6 +366,13 @@ def _force_fill_plan_to_single_texture(fill_plan: dict, texture_id: str) -> dict
                         piece.pop(key, None)
                 else:
                     piece[key] = forced
+        if preserve_front_pair:
+            piece["front_pair_seam_locked"] = True
+            base = piece.get("base")
+            if isinstance(base, dict):
+                base["front_pair_seam_locked"] = True
+                base["global_front_texture"] = True
+                base.setdefault("pair_texture_constraint", "front_seam")
         overlay = piece.get("overlay")
         if isinstance(overlay, dict):
             forced_overlay = _force_render_layer(overlay)

@@ -493,6 +493,16 @@ def enforce_pair_texture_constraints(entries: list[dict], garment_map: dict, pie
                 base["offset_y"] = round(new_y)
                 changed.append("offset_y")
             base["pair_texture_constraint"] = mode
+            if mode == "front_seam":
+                if not member.get("front_pair_seam_locked"):
+                    member["front_pair_seam_locked"] = True
+                    changed.append("front_pair_seam_locked")
+                if not base.get("front_pair_seam_locked"):
+                    base["front_pair_seam_locked"] = True
+                    changed.append("base.front_pair_seam_locked")
+                if not base.get("global_front_texture"):
+                    base["global_front_texture"] = True
+                    changed.append("base.global_front_texture")
             member["pair_texture_constraint"] = {"group": group, "mode": mode, "source_piece_id": master["piece_id"]}
             member.pop("symmetry_source", None)
             member.pop("symmetry_transform", None)

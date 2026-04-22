@@ -16,7 +16,7 @@
 | 主题图解析（多格式/URL/base64） | ✅ 保留 |
 | 视觉分析（visual_elements.json） | ✅ 保留完整 schema，LLM 单次调用 |
 | 设计简报（texture_prompts.json） | ✅ 保留，Python 规则引擎生成 |
-| Neo AI 单纹理生成（main/secondary/accent_light） | ✅ 保留，Python 直接调用 API |
+| Neo AI 单纹理生成 | ✅ 保留，Python 直接调用 API |
 | 透明主图生成（hero_motif） | ✅ 保留 |
 | 主题前片切半（theme_front_full/left/right） | ✅ 保留完整逻辑 |
 | 裁片填充计划（规则引擎 + 对称约束 + 成对相位） | ✅ 保留完整逻辑 |

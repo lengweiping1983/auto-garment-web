@@ -1305,7 +1305,7 @@
                             </div>
                             <div class="download-btns">
                                 <button class="btn btn-primary" id="downloadPngBtn" onclick="downloadPngPackage()" disabled>导出 PNG</button>
-                                <button class="btn btn-primary" id="downloadSvgBtn" onclick="downloadSvgPackage()" disabled>导出 SVG</button>
+                                <button class="btn btn-primary" id="downloadSvgBtn" onclick="downloadSvgPackage()" disabled>导出 SVG（很慢🐢）</button>
                             </div>
                         </div>
                     </div>
@@ -2870,20 +2870,45 @@
             setTimeout(() => a.remove(), 100);
         }
 
+        function _downloadWithFeedback(url, filename, btnId) {
+            const btn = document.getElementById(btnId);
+            const originalText = btn ? btn.textContent : '';
+            if (btn) {
+                btn.disabled = true;
+                btn.textContent = '生成中…';
+            }
+            // 用原生 <a> 下载，不阻塞页面、不占用内存
+            _triggerDownload(url, filename);
+            // 5 秒后自动恢复按钮，防止用户以为页面卡死
+            setTimeout(() => {
+                if (btn) {
+                    btn.disabled = false;
+                    btn.textContent = originalText;
+                }
+            }, 5000);
+        }
+
         function downloadPngPackage() {
             if (!currentTaskId) return;
-            _triggerDownload(apiUrl(`/api/v1/tasks/${currentTaskId}/download/png`), `auto_garment_${currentTaskId}_png.zip`);
+            _downloadWithFeedback(
+                apiUrl(`/api/v1/tasks/${currentTaskId}/download/png`),
+                `auto_garment_${currentTaskId}_png.zip`,
+                'downloadPngBtn'
+            );
         }
 
         function downloadSvgPackage() {
             if (!currentTaskId) return;
-            _triggerDownload(apiUrl(`/api/v1/tasks/${currentTaskId}/download/svg`), `auto_garment_${currentTaskId}_svg.zip`);
+            _downloadWithFeedback(
+                apiUrl(`/api/v1/tasks/${currentTaskId}/download/svg`),
+                `auto_garment_${currentTaskId}_svg.zip`,
+                'downloadSvgBtn'
+            );
         }
 
         function downloadResults() {
             if (!currentTaskId) return;
             _triggerDownload(apiUrl(`/api/v1/tasks/${currentTaskId}/download`), `auto_garment_${currentTaskId}.zip`);
-            document.body.removeChild(a);
         }
 
         async function deleteTask(taskId) {

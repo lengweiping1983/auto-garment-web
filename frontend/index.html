@@ -490,6 +490,20 @@
             color: var(--muted);
         }
 
+        .surface-hint {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            margin-top: 8px;
+            padding: 7px 11px;
+            border-radius: 999px;
+            font-size: 12px;
+            font-weight: 600;
+            color: var(--accent-deep);
+            background: rgba(198, 92, 55, 0.08);
+            border: 1px solid rgba(198, 92, 55, 0.12);
+        }
+
         .surface-tag {
             flex-shrink: 0;
             display: inline-flex;
@@ -1022,6 +1036,7 @@
                         <div>
                             <h3>参考图与中间素材</h3>
                             <p>这里集中放主题图、主图和三组纹理。</p>
+                            <div class="surface-hint">选中主图或纹理后，可按删除键删除。</div>
                         </div>
                         <div style="display:flex;align-items:center;gap:10px;">
                             <button class="btn-render hidden" id="continueRenderBtn" onclick="continueRender()">重新渲染</button>

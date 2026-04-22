@@ -11,6 +11,8 @@ BG_SPREAD_MAX = 40
 BG_DISTANCE_MAX = 54
 MIN_SUBJECT_AREA_RATIO = 0.03
 MIN_INTERNAL_BG_AREA_RATIO = 0.00012
+MIN_LARGE_INTERNAL_BG_AREA_RATIO = 0.006
+LARGE_INTERNAL_BG_FILL_RATIO_MAX = 0.68
 ALPHA_TRANSPARENCY_RATIO_MIN = 0.002
 
 
@@ -109,6 +111,7 @@ def _fill_enclosed_background_holes(rgb: Image.Image, bg_mask: Image.Image) -> I
     bg_px = bg_mask.load()
     seen = bytearray(w * h)
     min_area = max(24, round(w * h * MIN_INTERNAL_BG_AREA_RATIO))
+    large_area = max(160, round(w * h * MIN_LARGE_INTERNAL_BG_AREA_RATIO))
 
     for y in range(h):
         for x in range(w):
@@ -151,6 +154,12 @@ def _fill_enclosed_background_holes(rgb: Image.Image, bg_mask: Image.Image) -> I
             boundary_total = 0
             boundary_bg_like = 0
             component_set = set(component)
+            min_x = min(cx for cx, _ in component)
+            max_x = max(cx for cx, _ in component)
+            min_y = min(cy for _, cy in component)
+            max_y = max(cy for _, cy in component)
+            bbox_area = max(1, (max_x - min_x + 1) * (max_y - min_y + 1))
+            fill_ratio = len(component) / bbox_area
             for cx, cy in component:
                 for nx, ny in ((cx - 1, cy), (cx + 1, cy), (cx, cy - 1), (cx, cy + 1)):
                     if nx < 0 or ny < 0 or nx >= w or ny >= h or (nx, ny) in component_set:
@@ -158,10 +167,18 @@ def _fill_enclosed_background_holes(rgb: Image.Image, bg_mask: Image.Image) -> I
                     boundary_total += 1
                     if bg_px[nx, ny] > 0 or _is_background_pixel(pixels[nx, ny], palette):
                         boundary_bg_like += 1
-            if boundary_total and boundary_bg_like / boundary_total < 0.58:
+            if boundary_total and boundary_bg_like / boundary_total >= 0.58:
+                for cx, cy in component:
+                    bg_px[cx, cy] = 255
                 continue
-            for cx, cy in component:
-                bg_px[cx, cy] = 255
+
+            # Large irregular light holes inside the motif are usually trapped
+            # white background, not intentional white subject detail. Preserve
+            # small/high-fill white regions such as teeth or specular highlights.
+            if len(component) >= large_area and fill_ratio <= LARGE_INTERNAL_BG_FILL_RATIO_MAX:
+                for cx, cy in component:
+                    bg_px[cx, cy] = 255
+                continue
 
     return bg_mask
 

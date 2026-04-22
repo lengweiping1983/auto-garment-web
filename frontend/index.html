@@ -274,6 +274,19 @@
             box-shadow: 0 12px 32px rgba(0, 0, 0, 0.18);
         }
 
+        .upload-actions {
+            display: flex;
+            gap: 10px;
+            margin-top: 12px;
+        }
+
+        .upload-actions .btn {
+            width: auto;
+            flex: 1;
+            min-height: 40px;
+            font-size: 13px;
+        }
+
         .btn {
             display: inline-flex;
             align-items: center;
@@ -877,6 +890,155 @@
             background: rgba(255, 255, 255, 0.18);
         }
 
+        .editor-modal {
+            display: none;
+            position: fixed;
+            inset: 0;
+            z-index: 1100;
+            padding: 28px;
+            background: rgba(8, 9, 14, 0.82);
+            backdrop-filter: blur(10px);
+        }
+
+        .editor-modal.active {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .editor-panel {
+            width: min(1120px, 96vw);
+            max-height: 92vh;
+            overflow: hidden;
+            display: grid;
+            grid-template-columns: minmax(0, 1fr) 280px;
+            border-radius: 28px;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            background: linear-gradient(180deg, rgba(21, 24, 33, 0.98), rgba(30, 34, 46, 0.98));
+            box-shadow: 0 28px 100px rgba(0, 0, 0, 0.42);
+        }
+
+        .editor-stage {
+            padding: 22px;
+            border-right: 1px solid rgba(255, 255, 255, 0.08);
+            display: flex;
+            flex-direction: column;
+            gap: 14px;
+            min-width: 0;
+        }
+
+        .editor-toolbar {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 12px;
+            color: rgba(255, 248, 241, 0.88);
+        }
+
+        .editor-toolbar h3 {
+            font-size: 20px;
+            font-weight: 600;
+        }
+
+        .editor-toolbar p {
+            font-size: 12px;
+            color: rgba(255, 248, 241, 0.58);
+        }
+
+        .editor-canvas-wrap {
+            position: relative;
+            flex: 1;
+            min-height: 420px;
+            border-radius: 22px;
+            overflow: auto;
+            background:
+                linear-gradient(180deg, rgba(255, 250, 246, 0.08), rgba(255, 255, 255, 0.02)),
+                repeating-linear-gradient(45deg, rgba(255, 255, 255, 0.06), rgba(255, 255, 255, 0.06) 12px, rgba(255, 255, 255, 0.02) 12px, rgba(255, 255, 255, 0.02) 24px);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 18px;
+        }
+
+        .editor-canvas-shell {
+            position: relative;
+            display: inline-block;
+            line-height: 0;
+        }
+
+        .editor-canvas {
+            max-width: min(100%, 760px);
+            max-height: 72vh;
+            border-radius: 18px;
+            background: white;
+            cursor: crosshair;
+            box-shadow: 0 18px 40px rgba(0, 0, 0, 0.3);
+        }
+
+        .editor-selection {
+            position: absolute;
+            display: none;
+            border: 2px solid rgba(99, 174, 255, 0.95);
+            background: rgba(99, 174, 255, 0.16);
+            box-shadow: 0 0 0 9999px rgba(8, 9, 14, 0.18);
+            pointer-events: none;
+        }
+
+        .editor-sidebar {
+            padding: 22px;
+            display: flex;
+            flex-direction: column;
+            gap: 14px;
+            color: rgba(255, 248, 241, 0.88);
+        }
+
+        .editor-card {
+            padding: 16px;
+            border-radius: 18px;
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid rgba(255, 255, 255, 0.06);
+        }
+
+        .editor-card h4 {
+            font-size: 14px;
+            font-weight: 700;
+            color: #fff8f1;
+        }
+
+        .editor-card p,
+        .editor-meta {
+            margin-top: 8px;
+            font-size: 12px;
+            line-height: 1.6;
+            color: rgba(255, 248, 241, 0.64);
+        }
+
+        .editor-actions {
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 10px;
+            margin-top: auto;
+        }
+
+        .editor-actions .btn,
+        .editor-card .btn {
+            width: 100%;
+        }
+
+        .editor-shortcut {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            min-width: 54px;
+            padding: 3px 8px;
+            border-radius: 999px;
+            margin-right: 8px;
+            font-size: 11px;
+            color: #fff0e7;
+            background: rgba(198, 92, 55, 0.22);
+            border: 1px solid rgba(198, 92, 55, 0.28);
+        }
+
         @keyframes rise-in {
             from {
                 opacity: 0;
@@ -938,6 +1100,15 @@
                 flex: 1;
                 min-width: 0;
             }
+
+            .editor-panel {
+                grid-template-columns: 1fr;
+            }
+
+            .editor-stage {
+                border-right: none;
+                border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+            }
         }
     </style>
 </head>
@@ -970,6 +1141,10 @@
                         <p>拖拽图片到这里，或点击上传一张参考图</p>
                         <input type="file" id="themeImage" accept="image/*" style="display:none">
                         <div id="imagePreview"></div>
+                    </div>
+                    <div class="upload-actions">
+                        <button class="btn btn-secondary" id="editThemeBtn" type="button" onclick="openThemeEditor()" disabled>编辑图片</button>
+                        <button class="btn btn-secondary" id="clearThemeBtn" type="button" onclick="clearThemeUpload()" disabled>清空图片</button>
                     </div>
                 </div>
 
@@ -1144,6 +1319,53 @@
         <img id="lightboxImg" src="" alt="">
     </div>
 
+    <div class="editor-modal" id="themeEditorModal">
+        <div class="editor-panel">
+            <div class="editor-stage">
+                <div class="editor-toolbar">
+                    <div>
+                        <h3>主题图编辑器</h3>
+                        <p>支持框选裁切、复制选区，以及把剪贴板里的图片贴到当前图上。</p>
+                    </div>
+                    <button class="btn btn-secondary btn-sm" type="button" onclick="closeThemeEditor()">关闭</button>
+                </div>
+                <div class="editor-canvas-wrap">
+                    <div class="editor-canvas-shell" id="editorCanvasShell">
+                        <canvas class="editor-canvas" id="themeEditorCanvas"></canvas>
+                        <div class="editor-selection" id="editorSelection"></div>
+                    </div>
+                </div>
+            </div>
+            <div class="editor-sidebar">
+                <div class="editor-card">
+                    <h4>当前操作</h4>
+                    <div class="editor-meta" id="editorStatusText">先上传一张图片，再进入编辑器。</div>
+                </div>
+                <div class="editor-card">
+                    <h4>快捷操作</h4>
+                    <p><span class="editor-shortcut">拖拽</span>框选要裁切或复制的区域</p>
+                    <p><span class="editor-shortcut">Ctrl/Cmd+C</span>复制当前选区</p>
+                    <p><span class="editor-shortcut">Ctrl/Cmd+V</span>粘贴剪贴板图片到画布中央</p>
+                </div>
+                <div class="editor-card">
+                    <h4>选区</h4>
+                    <button class="btn btn-secondary btn-sm" type="button" onclick="cropEditorSelection()">裁切选区</button>
+                    <button class="btn btn-secondary btn-sm" type="button" onclick="copyEditorSelection()">复制选区</button>
+                    <button class="btn btn-secondary btn-sm" type="button" onclick="clearEditorSelection()">清除选区</button>
+                </div>
+                <div class="editor-card">
+                    <h4>贴图</h4>
+                    <button class="btn btn-secondary btn-sm" type="button" onclick="applyOverlayToEditor()" id="applyOverlayBtn" disabled>合并贴图</button>
+                    <button class="btn btn-secondary btn-sm" type="button" onclick="discardOverlay()" id="discardOverlayBtn" disabled>取消贴图</button>
+                </div>
+                <div class="editor-actions">
+                    <button class="btn btn-secondary" type="button" onclick="resetThemeEditor()">恢复原图</button>
+                    <button class="btn btn-primary" type="button" onclick="saveThemeEditor()">保存到上传图</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <script src="config.js"></script>
     <script>
         function apiUrl(path) {
@@ -1157,6 +1379,19 @@
         let lastRerenderStatus = null;
         let lightboxAssetType = null;
         let selectedReferenceType = null;
+        let themePreviewUrl = '';
+        const editorState = {
+            originalDataUrl: '',
+            workingDataUrl: '',
+            image: null,
+            overlayImage: null,
+            overlay: null,
+            selection: null,
+            isSelecting: false,
+            isDraggingOverlay: false,
+            pointerStart: null,
+            dragOffset: null,
+        };
 
         function phaseDisplayName(status) {
             return {
@@ -1222,6 +1457,7 @@
 
         document.addEventListener('keydown', (e) => {
             if (e.key === 'Escape') closeLightbox();
+            if (e.key === 'Escape' && themeEditorModal.classList.contains('active')) closeThemeEditor();
             const targetEl = e.target instanceof Element ? e.target : null;
             if ((e.key === 'Delete' || e.key === 'Backspace') && !(targetEl && targetEl.closest('input, textarea, select'))) {
                 const deleteTarget = lightboxAssetType || selectedReferenceType;
@@ -1379,6 +1615,16 @@
         const uploadArea = document.getElementById('uploadArea');
         const fileInput = document.getElementById('themeImage');
         const imagePreview = document.getElementById('imagePreview');
+        const editThemeBtn = document.getElementById('editThemeBtn');
+        const clearThemeBtn = document.getElementById('clearThemeBtn');
+        const themeEditorModal = document.getElementById('themeEditorModal');
+        const editorCanvas = document.getElementById('themeEditorCanvas');
+        const editorSelectionEl = document.getElementById('editorSelection');
+        const editorStatusText = document.getElementById('editorStatusText');
+
+        themeEditorModal.addEventListener('click', (event) => {
+            if (event.target === themeEditorModal) closeThemeEditor();
+        });
 
         uploadArea.addEventListener('click', () => fileInput.click());
         uploadArea.addEventListener('dragover', (e) => {
@@ -1391,21 +1637,370 @@
             uploadArea.classList.remove('dragover');
             const files = e.dataTransfer.files;
             if (files.length) {
-                fileInput.files = files;
-                showPreview(files[0]);
+                setThemeFile(files[0]);
             }
         });
         fileInput.addEventListener('change', () => {
-            if (fileInput.files.length) showPreview(fileInput.files[0]);
+            if (fileInput.files.length) setThemeFile(fileInput.files[0]);
         });
+
+        uploadArea.addEventListener('paste', async (e) => {
+            const file = await extractImageFromClipboardEvent(e);
+            if (!file) return;
+            e.preventDefault();
+            setThemeFile(file);
+        });
+
+        function updateThemeActionButtons() {
+            const hasFile = !!(fileInput.files && fileInput.files.length);
+            editThemeBtn.disabled = !hasFile;
+            clearThemeBtn.disabled = !hasFile;
+        }
+
+        function setThemeFile(file) {
+            const transfer = new DataTransfer();
+            transfer.items.add(file);
+            fileInput.files = transfer.files;
+            showPreview(file);
+            updateThemeActionButtons();
+        }
 
         function showPreview(file) {
             const reader = new FileReader();
             reader.onload = (e) => {
-                imagePreview.innerHTML = `<img src="${e.target.result}" alt="preview">`;
+                themePreviewUrl = e.target.result;
+                imagePreview.innerHTML = `<img src="${themePreviewUrl}" alt="preview">`;
             };
             reader.readAsDataURL(file);
         }
+
+        function clearThemeUpload() {
+            fileInput.value = '';
+            themePreviewUrl = '';
+            imagePreview.innerHTML = '';
+            updateThemeActionButtons();
+        }
+
+        updateThemeActionButtons();
+
+        function loadImage(src) {
+            return new Promise((resolve, reject) => {
+                const img = new Image();
+                img.onload = () => resolve(img);
+                img.onerror = () => reject(new Error('图片加载失败'));
+                img.src = src;
+            });
+        }
+
+        function canvasPointFromEvent(event) {
+            const rect = editorCanvas.getBoundingClientRect();
+            const scaleX = editorCanvas.width / rect.width;
+            const scaleY = editorCanvas.height / rect.height;
+            return {
+                x: Math.max(0, Math.min(editorCanvas.width, (event.clientX - rect.left) * scaleX)),
+                y: Math.max(0, Math.min(editorCanvas.height, (event.clientY - rect.top) * scaleY)),
+            };
+        }
+
+        function normalizeRect(start, end) {
+            const x = Math.min(start.x, end.x);
+            const y = Math.min(start.y, end.y);
+            return {
+                x: Math.round(x),
+                y: Math.round(y),
+                width: Math.round(Math.abs(end.x - start.x)),
+                height: Math.round(Math.abs(end.y - start.y)),
+            };
+        }
+
+        function updateSelectionVisual() {
+            const selection = editorState.selection;
+            if (!selection || selection.width < 2 || selection.height < 2) {
+                editorSelectionEl.style.display = 'none';
+                return;
+            }
+            const scaleX = editorCanvas.clientWidth / editorCanvas.width;
+            const scaleY = editorCanvas.clientHeight / editorCanvas.height;
+            editorSelectionEl.style.display = 'block';
+            editorSelectionEl.style.left = `${selection.x * scaleX}px`;
+            editorSelectionEl.style.top = `${selection.y * scaleY}px`;
+            editorSelectionEl.style.width = `${selection.width * scaleX}px`;
+            editorSelectionEl.style.height = `${selection.height * scaleY}px`;
+        }
+
+        function updateOverlayButtons() {
+            const hasOverlay = !!(editorState.overlay && editorState.overlayImage);
+            document.getElementById('applyOverlayBtn').disabled = !hasOverlay;
+            document.getElementById('discardOverlayBtn').disabled = !hasOverlay;
+        }
+
+        function setEditorStatus(text) {
+            editorStatusText.textContent = text;
+        }
+
+        function drawEditorCanvas() {
+            const ctx = editorCanvas.getContext('2d');
+            if (!ctx || !editorState.image) return;
+            editorCanvas.width = editorState.image.width;
+            editorCanvas.height = editorState.image.height;
+            ctx.clearRect(0, 0, editorCanvas.width, editorCanvas.height);
+            ctx.drawImage(editorState.image, 0, 0);
+            if (editorState.overlay && editorState.overlayImage) {
+                const { x, y, width, height } = editorState.overlay;
+                ctx.save();
+                ctx.globalAlpha = 0.96;
+                ctx.drawImage(editorState.overlayImage, x, y, width, height);
+                ctx.strokeStyle = 'rgba(198, 92, 55, 0.95)';
+                ctx.lineWidth = Math.max(2, Math.round(editorCanvas.width / 280));
+                ctx.setLineDash([10, 8]);
+                ctx.strokeRect(x, y, width, height);
+                ctx.restore();
+            }
+            updateSelectionVisual();
+            updateOverlayButtons();
+        }
+
+        async function syncEditorImage(dataUrl, keepOriginal = false) {
+            const img = await loadImage(dataUrl);
+            if (keepOriginal || !editorState.originalDataUrl) {
+                editorState.originalDataUrl = dataUrl;
+            }
+            editorState.workingDataUrl = dataUrl;
+            editorState.image = img;
+            editorState.selection = null;
+            editorState.overlay = null;
+            editorState.overlayImage = null;
+            drawEditorCanvas();
+        }
+
+        async function openThemeEditor() {
+            if (!(fileInput.files && fileInput.files.length)) return;
+            if (!themePreviewUrl) {
+                await new Promise((resolve, reject) => {
+                    const reader = new FileReader();
+                    reader.onload = (e) => {
+                        themePreviewUrl = e.target.result;
+                        resolve();
+                    };
+                    reader.onerror = () => reject(new Error('图片读取失败'));
+                    reader.readAsDataURL(fileInput.files[0]);
+                });
+            }
+            await syncEditorImage(themePreviewUrl, true);
+            themeEditorModal.classList.add('active');
+            setEditorStatus('拖拽框选裁切区域，或者直接粘贴一张图片到当前画布。');
+        }
+
+        function closeThemeEditor() {
+            themeEditorModal.classList.remove('active');
+        }
+
+        async function resetThemeEditor() {
+            if (!editorState.originalDataUrl) return;
+            await syncEditorImage(editorState.originalDataUrl, true);
+            setEditorStatus('已恢复为原始上传图。');
+        }
+
+        function clearEditorSelection() {
+            editorState.selection = null;
+            updateSelectionVisual();
+            setEditorStatus('已清除选区。');
+        }
+
+        async function cropEditorSelection() {
+            const sel = editorState.selection;
+            if (!sel || sel.width < 2 || sel.height < 2) {
+                setEditorStatus('先框选一个有效区域，再执行裁切。');
+                return;
+            }
+            const offscreen = document.createElement('canvas');
+            offscreen.width = sel.width;
+            offscreen.height = sel.height;
+            const offCtx = offscreen.getContext('2d');
+            offCtx.drawImage(editorCanvas, sel.x, sel.y, sel.width, sel.height, 0, 0, sel.width, sel.height);
+            await syncEditorImage(offscreen.toDataURL('image/png'));
+            setEditorStatus(`已裁切到 ${sel.width} × ${sel.height}。`);
+        }
+
+        async function copyBlobToClipboard(blob) {
+            if (navigator.clipboard && window.ClipboardItem) {
+                await navigator.clipboard.write([new ClipboardItem({ [blob.type]: blob })]);
+                return true;
+            }
+            return false;
+        }
+
+        async function copyEditorSelection() {
+            const sel = editorState.selection;
+            if (!sel || sel.width < 2 || sel.height < 2) {
+                setEditorStatus('先框选一个区域，才能复制。');
+                return;
+            }
+            const offscreen = document.createElement('canvas');
+            offscreen.width = sel.width;
+            offscreen.height = sel.height;
+            const offCtx = offscreen.getContext('2d');
+            offCtx.drawImage(editorCanvas, sel.x, sel.y, sel.width, sel.height, 0, 0, sel.width, sel.height);
+            const blob = await new Promise(resolve => offscreen.toBlob(resolve, 'image/png'));
+            if (!blob) {
+                setEditorStatus('复制失败，浏览器没有生成图片数据。');
+                return;
+            }
+            try {
+                const copied = await copyBlobToClipboard(blob);
+                setEditorStatus(copied ? '已复制选区图片到系统剪贴板。' : '当前浏览器不支持系统图片写入，但你仍可以继续裁切或保存。');
+            } catch (err) {
+                setEditorStatus('复制被浏览器拦截了，请确认页面拥有剪贴板权限。');
+            }
+        }
+
+        async function createOverlayFromFile(file) {
+            const dataUrl = await new Promise((resolve, reject) => {
+                const reader = new FileReader();
+                reader.onload = (e) => resolve(e.target.result);
+                reader.onerror = () => reject(new Error('读取图片失败'));
+                reader.readAsDataURL(file);
+            });
+            const img = await loadImage(dataUrl);
+            const maxWidth = Math.max(80, Math.round(editorCanvas.width * 0.45));
+            const scale = Math.min(1, maxWidth / img.width);
+            const width = Math.max(40, Math.round(img.width * scale));
+            const height = Math.max(40, Math.round(img.height * scale));
+            editorState.overlayImage = img;
+            editorState.overlay = {
+                x: Math.round((editorCanvas.width - width) / 2),
+                y: Math.round((editorCanvas.height - height) / 2),
+                width,
+                height,
+            };
+            drawEditorCanvas();
+            setEditorStatus('已把剪贴板图片贴到画布中央，可以拖动位置后再合并。');
+        }
+
+        function discardOverlay() {
+            editorState.overlay = null;
+            editorState.overlayImage = null;
+            drawEditorCanvas();
+            setEditorStatus('已取消当前贴图。');
+        }
+
+        async function applyOverlayToEditor() {
+            if (!(editorState.overlay && editorState.overlayImage)) {
+                setEditorStatus('还没有可合并的贴图。');
+                return;
+            }
+            const mergedCanvas = document.createElement('canvas');
+            mergedCanvas.width = editorCanvas.width;
+            mergedCanvas.height = editorCanvas.height;
+            const mergedCtx = mergedCanvas.getContext('2d');
+            mergedCtx.drawImage(editorState.image, 0, 0);
+            const { x, y, width, height } = editorState.overlay;
+            mergedCtx.drawImage(editorState.overlayImage, x, y, width, height);
+            await syncEditorImage(mergedCanvas.toDataURL('image/png'));
+            setEditorStatus('已把贴图合并到当前主题图。');
+        }
+
+        async function extractImageFromClipboardEvent(event) {
+            const items = Array.from((event.clipboardData && event.clipboardData.items) || []);
+            const imageItem = items.find(item => item.type && item.type.startsWith('image/'));
+            return imageItem ? imageItem.getAsFile() : null;
+        }
+
+        async function saveThemeEditor() {
+            const blob = await new Promise(resolve => editorCanvas.toBlob(resolve, 'image/png'));
+            if (!blob) {
+                setEditorStatus('保存失败，浏览器没有返回图片数据。');
+                return;
+            }
+            const file = new File([blob], 'theme_image_edited.png', { type: 'image/png' });
+            setThemeFile(file);
+            closeThemeEditor();
+        }
+
+        editorCanvas.addEventListener('mousedown', (event) => {
+            if (!editorState.image) return;
+            const point = canvasPointFromEvent(event);
+            const overlay = editorState.overlay;
+            if (
+                overlay &&
+                point.x >= overlay.x &&
+                point.x <= overlay.x + overlay.width &&
+                point.y >= overlay.y &&
+                point.y <= overlay.y + overlay.height
+            ) {
+                editorState.isDraggingOverlay = true;
+                editorState.dragOffset = { x: point.x - overlay.x, y: point.y - overlay.y };
+                setEditorStatus('拖动中，松开鼠标即可放置贴图。');
+                return;
+            }
+            editorState.isSelecting = true;
+            editorState.pointerStart = point;
+            editorState.selection = { x: point.x, y: point.y, width: 0, height: 0 };
+            updateSelectionVisual();
+        });
+
+        window.addEventListener('mousemove', (event) => {
+            if (!themeEditorModal.classList.contains('active')) return;
+            if (editorState.isDraggingOverlay && editorState.overlay) {
+                const point = canvasPointFromEvent(event);
+                editorState.overlay.x = Math.round(Math.max(0, Math.min(editorCanvas.width - editorState.overlay.width, point.x - editorState.dragOffset.x)));
+                editorState.overlay.y = Math.round(Math.max(0, Math.min(editorCanvas.height - editorState.overlay.height, point.y - editorState.dragOffset.y)));
+                drawEditorCanvas();
+                return;
+            }
+            if (!editorState.isSelecting || !editorState.pointerStart) return;
+            const point = canvasPointFromEvent(event);
+            editorState.selection = normalizeRect(editorState.pointerStart, point);
+            updateSelectionVisual();
+        });
+
+        window.addEventListener('mouseup', () => {
+            if (editorState.isDraggingOverlay) {
+                editorState.isDraggingOverlay = false;
+                editorState.dragOffset = null;
+                setEditorStatus('贴图位置已更新，确认后可点击“合并贴图”。');
+            }
+            if (!editorState.isSelecting) return;
+            editorState.isSelecting = false;
+            const sel = editorState.selection;
+            if (!sel || sel.width < 2 || sel.height < 2) {
+                editorState.selection = null;
+                updateSelectionVisual();
+                setEditorStatus('已取消选区。');
+                return;
+            }
+            setEditorStatus(`已选中 ${sel.width} × ${sel.height} 区域。`);
+        });
+
+        document.addEventListener('keydown', async (event) => {
+            if (!themeEditorModal.classList.contains('active')) return;
+            const isCopy = (event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'c';
+            if (isCopy) {
+                event.preventDefault();
+                await copyEditorSelection();
+            }
+        });
+
+        document.addEventListener('paste', async (event) => {
+            if (!themeEditorModal.classList.contains('active')) return;
+            const file = await extractImageFromClipboardEvent(event);
+            if (!file) {
+                setEditorStatus('剪贴板里没有可用图片。');
+                return;
+            }
+            event.preventDefault();
+            await createOverlayFromFile(file);
+        });
+
+        document.addEventListener('paste', async (event) => {
+            if (themeEditorModal.classList.contains('active')) return;
+            const targetEl = event.target instanceof Element ? event.target : null;
+            if (targetEl && targetEl.closest('input, textarea, select, [contenteditable="true"]')) return;
+            const file = await extractImageFromClipboardEvent(event);
+            if (!file) return;
+            event.preventDefault();
+            setThemeFile(file);
+        });
 
         function switchMode(mode) {
             if (mode === 'new') {
@@ -1540,8 +2135,7 @@
                 setDownloadEnabled(false);
                 resetReferenceImages();
                 // Reset form
-                fileInput.value = '';
-                document.getElementById('imagePreview').innerHTML = '';
+                clearThemeUpload();
                 document.getElementById('garmentType').selectedIndex = 0;
                 document.getElementById('userPrompt').value = '';
                 document.getElementById('neoModel').value = DEFAULT_NEO_MODEL;

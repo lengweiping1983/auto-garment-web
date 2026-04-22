@@ -46,6 +46,27 @@ def _make_faux_transparent_subject(path: Path) -> None:
     img.save(path)
 
 
+def _make_large_enclosed_white_hole_subject(path: Path) -> None:
+    img = Image.new("RGB", (260, 260), (248, 248, 248))
+    draw = ImageDraw.Draw(img)
+
+    # Build a connected dark silhouette with a large irregular white cavity
+    # similar to trapped background between multiple visual elements.
+    draw.ellipse((26, 24, 170, 182), fill=(58, 74, 92))
+    draw.rounded_rectangle((118, 20, 236, 92), radius=26, fill=(58, 74, 92))
+    draw.ellipse((140, 96, 244, 236), fill=(58, 74, 92))
+    draw.rectangle((116, 72, 190, 150), fill=(58, 74, 92))
+
+    # Large internal white hole that should be treated as background.
+    draw.pieslice((92, 76, 212, 208), start=232, end=26, fill=(248, 248, 248))
+    draw.ellipse((120, 102, 180, 162), fill=(248, 248, 248))
+
+    # Small white highlights that should still survive.
+    draw.ellipse((82, 86, 98, 102), fill=(248, 248, 248))
+    draw.ellipse((104, 70, 116, 82), fill=(248, 248, 248))
+    img.save(path)
+
+
 def test_create_front_split_assets_removes_white_background_and_keeps_inner_whites(tmp_path: Path) -> None:
     source = tmp_path / "hero.png"
     _make_white_bg_subject(source)
@@ -137,3 +158,37 @@ def test_create_front_split_assets_handles_faux_transparent_ai_background(tmp_pa
     assert nonzero > 0, "expected extracted subject to remain after faux-alpha cleanup"
     assert semi_transparent > 0, "expected softened anti-aliased edge to survive extraction"
     assert near_white_opaque > 0, "expected internal bright details to survive faux-alpha extraction"
+
+
+def test_create_front_split_assets_removes_large_enclosed_white_holes_but_keeps_small_highlights(tmp_path: Path) -> None:
+    source = tmp_path / "hero_large_hole.png"
+    _make_large_enclosed_white_hole_subject(source)
+
+    split_assets = create_front_split_assets(source, tmp_path)
+
+    full = Image.open(split_assets["full"]).convert("RGBA")
+    mask = Image.open(tmp_path / "assets" / "theme_front_mask.png").convert("L")
+
+    assert full.getchannel("A").getbbox() is not None
+    assert mask.getbbox() is not None
+
+    alpha = full.getchannel("A")
+    alpha_px = alpha.load()
+    pixels = full.load()
+
+    # The large central white cavity should now be punched out as background.
+    transparent_inside_hole = 0
+    for y in range(118, 170):
+        for x in range(126, 188):
+            if alpha_px[x, y] <= 8:
+                transparent_inside_hole += 1
+    assert transparent_inside_hole > 800, "expected the large enclosed white hole to be removed as background"
+
+    # Small white highlights should still remain visible and opaque.
+    preserved_highlights = 0
+    for y in range(full.height):
+        for x in range(full.width):
+            r, g, b, a = pixels[x, y]
+            if a > 220 and min((r, g, b)) >= 244:
+                preserved_highlights += 1
+    assert preserved_highlights > 50, "expected small internal white highlights to be preserved"

@@ -35,6 +35,10 @@ build/
 dist/
 *.egg-info/
 
+.env
+.env.local
+.env.*.local
+
 # OS / editor junk
 .DS_Store
 Thumbs.db

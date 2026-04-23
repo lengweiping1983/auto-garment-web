@@ -71,6 +71,72 @@ def _fix_truncated_json(text: str) -> str:
     return text + suffix
 
 
+def _strip_json_wrappers(text: str) -> str:
+    text = text.strip()
+    if text.startswith("```"):
+        text = text.split("\n", 1)[1] if "\n" in text else text[3:]
+    if text.endswith("```"):
+        text = text.rsplit("\n", 1)[0]
+    if text.startswith("json"):
+        text = text.split("\n", 1)[1] if "\n" in text else ""
+    return text.strip()
+
+
+def _extract_first_json_object(text: str) -> str:
+    start = text.find("{")
+    if start < 0:
+        return text
+
+    depth = 0
+    in_string = False
+    escape = False
+    for idx in range(start, len(text)):
+        ch = text[idx]
+        if escape:
+            escape = False
+            continue
+        if ch == "\\":
+            escape = True
+            continue
+        if ch == '"':
+            in_string = not in_string
+            continue
+        if in_string:
+            continue
+        if ch == "{":
+            depth += 1
+        elif ch == "}":
+            depth -= 1
+            if depth == 0:
+                return text[start : idx + 1]
+
+    return text[start:]
+
+
+def _parse_json_payload(text: str) -> dict:
+    normalized = _strip_json_wrappers(text)
+    candidates: list[str] = []
+    for candidate in (
+        normalized,
+        _extract_first_json_object(normalized),
+        _fix_truncated_json(_extract_first_json_object(normalized)),
+        _fix_truncated_json(normalized),
+    ):
+        if candidate and candidate not in candidates:
+            candidates.append(candidate)
+
+    last_exc: json.JSONDecodeError | None = None
+    for candidate in candidates:
+        try:
+            return json.loads(candidate)
+        except json.JSONDecodeError as exc:
+            last_exc = exc
+
+    if last_exc is not None:
+        raise last_exc
+    raise json.JSONDecodeError("No JSON content found", normalized, 0)
+
+
 class VisionService:
     def __init__(self):
         self.client = LLMClient()
@@ -106,38 +172,43 @@ class VisionService:
             },
         ]
 
-        messages = [
+        base_messages = [
             {"role": "system", "content": get_hero_prompt_strategy(hero_prompt_scheme).vision_system_prompt},
             {"role": "user", "content": user_content},
         ]
 
-        content = await self.client.chat_completion(
-            messages=messages,
-            temperature=0.3,
-            max_tokens=16384,
-        )
+        data = None
+        last_exc: json.JSONDecodeError | None = None
+        last_content = ""
+        for attempt in range(2):
+            messages = list(base_messages)
+            if attempt > 0:
+                messages.append(
+                    {
+                        "role": "user",
+                        "content": "上一次输出不是合法 JSON。请只返回一个可被 json.loads 直接解析的 JSON 对象，不要 markdown，不要解释，不要补充说明。",
+                    }
+                )
 
-        content = content.strip()
-        if content.startswith("```"):
-            content = content.split("\n", 1)[1]
-        if content.endswith("```"):
-            content = content.rsplit("\n", 1)[0]
-        if content.startswith("json"):
-            content = content.split("\n", 1)[1]
+            content = await self.client.chat_completion(
+                messages=messages,
+                temperature=0.1 if attempt > 0 else 0.3,
+                max_tokens=16384,
+            )
+            last_content = content
 
-        content = content.strip()
-        # Fix truncated JSON by closing unclosed braces/brackets
-        content = _fix_truncated_json(content)
+            try:
+                data = _parse_json_payload(content)
+                break
+            except json.JSONDecodeError as exc:
+                last_exc = exc
+                print(f"[ERROR] Vision LLM returned invalid JSON on attempt {attempt + 1}: {exc}")
+                print(f"[ERROR] Raw content (first 2000 chars): {_strip_json_wrappers(content)[:2000]}")
 
-        try:
-            data = json.loads(content)
-        except json.JSONDecodeError as exc:
-            # Log raw response for debugging; save to work dir if possible
-            print(f"[ERROR] Vision LLM returned invalid JSON: {exc}")
-            print(f"[ERROR] Raw content (first 2000 chars): {content[:2000]}")
+        if data is None:
             raise RuntimeError(
-                f"视觉分析返回的 JSON 解析失败。请检查 LLM 输出格式。原始错误: {exc}"
-            ) from exc
+                f"视觉分析返回的 JSON 解析失败。请检查 LLM 输出格式。原始错误: {last_exc}. 响应片段: {_strip_json_wrappers(last_content)[:300]}"
+            ) from last_exc
 
         # Inject source image path for downstream traceability
         data["source_images"] = [{"index": 1, "path": str(image_path.resolve()), "role": "primary"}]

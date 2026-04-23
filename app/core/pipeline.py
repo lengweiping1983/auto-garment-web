@@ -997,16 +997,7 @@ async def run_pipeline(
                     "texture_3": {"status": "pending" if "texture_3" in needs_textures else ("deleted" if force_render and "texture_3" not in expected_texture_ids else "completed")},
                 },
             })
-            while needs_hero or needs_textures:
-                await asyncio.sleep(3)
-                hero_path = _resume_hero_path()
-                texture_paths = _resume_texture_paths()
-                needs_hero = hero_path is None and not allow_missing_hero
-                needs_textures = [tid for tid in expected_texture_ids if tid not in texture_paths]
-                _update_detail_field(task_id, "hero_motif", {"status": "pending" if needs_hero else ("deleted" if not hero_path else "completed"), "path": str(hero_path) if hero_path else ""})
-                for tid in all_texture_ids:
-                    texture_status = "pending" if tid in needs_textures else ("deleted" if force_render and tid not in expected_texture_ids else "completed")
-                    _update_detail_field(task_id, tid, {"status": texture_status, "path": str(texture_paths.get(tid, ""))})
+            return
 
         # If everything already exists, skip generation and run standard Phase 4-6
         if not needs_hero and not needs_textures:
@@ -1219,7 +1210,6 @@ async def run_pipeline(
                             hero_task = asyncio.create_task(_gen_hero(
                                 neo,
                                 prompt_map.get("hero_motif_1", ""),
-                                negative_map.get("hero_motif_1", ""),
                                 ref_url, model, size, hero_dir, task_id,
                             ))
                             pending.add(hero_task)

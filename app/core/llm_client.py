@@ -1,4 +1,5 @@
 """Vision LLM client wrapper."""
+import asyncio
 import base64
 from pathlib import Path
 
@@ -73,6 +74,23 @@ class LLMClient:
 
         return system_prompt, anthropic_messages
 
+    @staticmethod
+    def _is_retryable_error(exc: Exception) -> bool:
+        name = exc.__class__.__name__.lower()
+        message = str(exc).lower()
+        retry_markers = (
+            "ratelimit",
+            "rate_limit",
+            "429",
+            "overloaded",
+            "timeout",
+            "timed out",
+            "connection",
+            "temporarily unavailable",
+            "try again later",
+        )
+        return any(marker in name or marker in message for marker in retry_markers)
+
     async def chat_completion(
         self,
         messages: list[dict],
@@ -80,24 +98,32 @@ class LLMClient:
         max_tokens: int = 2048,
     ) -> str:
         """Unified chat completion supporting both OpenAI and Anthropic protocols."""
-        if self.protocol == "anthropic":
-            system_prompt, anthropic_messages = self._convert_messages_for_anthropic(messages)
-            response = await self._anthropic.messages.create(
-                model=self.model,
-                system=system_prompt,
-                messages=anthropic_messages,
-                max_tokens=max_tokens,
-                temperature=temperature,
-                extra_body={"chat_template_kwargs": {"thinking": False}},
-            )
-            return response.content[0].text if response.content else ""
+        attempts = 3
+        for attempt in range(attempts):
+            try:
+                if self.protocol == "anthropic":
+                    system_prompt, anthropic_messages = self._convert_messages_for_anthropic(messages)
+                    response = await self._anthropic.messages.create(
+                        model=self.model,
+                        system=system_prompt,
+                        messages=anthropic_messages,
+                        max_tokens=max_tokens,
+                        temperature=temperature,
+                        extra_body={"chat_template_kwargs": {"thinking": False}},
+                    )
+                    return response.content[0].text if response.content else ""
 
-        response = await self._openai.chat.completions.create(
-            model=self.model,
-            messages=messages,
-            temperature=temperature,
-            max_tokens=max_tokens,
-            extra_body={"chat_template_kwargs": {"thinking": False}},
-        )
-        return response.choices[0].message.content or ""
+                response = await self._openai.chat.completions.create(
+                    model=self.model,
+                    messages=messages,
+                    temperature=temperature,
+                    max_tokens=max_tokens,
+                    extra_body={"chat_template_kwargs": {"thinking": False}},
+                )
+                return response.choices[0].message.content or ""
+            except Exception as exc:
+                if attempt >= attempts - 1 or not self._is_retryable_error(exc):
+                    raise
+                await asyncio.sleep(2 ** attempt)
 
+        return ""

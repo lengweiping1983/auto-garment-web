@@ -2083,7 +2083,7 @@
                     lastPolledStatus = data.status;
                     lastRerenderStatus = getRerenderStatus(data.progress);
                     updateProgress(data);
-                    updateReferenceImages(taskId, data.progress, data.status);
+                    updateReferenceImages(taskId, data.progress, data.status, data.error);
                     // Ensure button state is correct after switching to a completed task
                     setTimeout(() => checkAllAssetsReady(), 100);
                     if (data.status === 'completed' && !isRerenderRunning(data.progress)) {
@@ -2099,11 +2099,20 @@
                         document.getElementById('previewGrid').innerHTML = '<div class="empty-state">暂无结果</div>';
                         document.getElementById('piecesGrid').innerHTML = '<div class="empty-state">暂无结果</div>';
                     }
+                } else {
+                    currentTaskId = null;
+                    selectedTaskId = null;
+                    setPageError(data.detail || '任务不存在，请从左侧选择一个有效任务。');
+                    document.getElementById('progressCard').classList.add('hidden');
+                    document.getElementById('referenceImagesCard').classList.add('hidden');
+                    updateWorkspaceHero('等待新建', 'idle', '当前任务不存在或已被删除，请重新选择任务。');
+                    await loadTasks();
                 }
             } catch (err) {
                 console.error(err);
                 // Force hide continue render button on error to avoid stuck UI
                 document.getElementById('continueRenderBtn').classList.add('hidden');
+                setPageError(err && err.message ? err.message : '读取任务失败');
             }
 
             // Keep sidebar in new-task mode, show task details on the right
@@ -2117,6 +2126,7 @@
             const btn = document.getElementById('submitBtn');
             btn.disabled = true;
             btn.textContent = '提交中...';
+            setPageError('');
             updateWorkspaceHero('提交新任务', 'pending', '新任务已开始排队，接下来会依次进入分析和生图流程。');
 
             const form = new FormData();
@@ -2150,7 +2160,7 @@
                 selectTask(currentTaskId);
                 startPolling();
             } catch (err) {
-                alert('错误: ' + err.message);
+                setPageError(`开始任务失败：${err.message}`);
                 btn.disabled = false;
                 btn.textContent = '开始生成';
                 updateWorkspaceHero('等待新建', 'idle', '上传灵感图，系统会依次完成分析、生图、纹理生成和裁片渲染。你在这里可以看到整条生产链的状态。');
@@ -2165,6 +2175,7 @@
             const btn = document.getElementById('retryBtn');
             btn.disabled = true;
             btn.textContent = '提交中...';
+            setPageError('');
             updateWorkspaceHero(selectedTaskId, 'pending', '重新执行已选任务，系统会在已有上下文基础上继续往下跑。');
 
             const form = new FormData();
@@ -2187,7 +2198,7 @@
                 loadTasks();
                 startPolling();
             } catch (err) {
-                alert('错误: ' + err.message);
+                setPageError(`继续任务失败：${err.message}`);
                 btn.disabled = false;
                 btn.textContent = '继续执行';
             }
@@ -2206,9 +2217,18 @@
             try {
                 const res = await fetch(apiUrl(`/api/v1/tasks/${currentTaskId}`));
                 const data = await res.json();
+                if (!res.ok) {
+                    clearInterval(pollInterval);
+                    pollInterval = null;
+                    currentTaskId = null;
+                    selectedTaskId = null;
+                    setPageError(data.detail || '任务不存在，请从左侧选择一个有效任务。');
+                    await loadTasks();
+                    return;
+                }
                 const rerenderStatus = getRerenderStatus(data.progress);
                 updateProgress(data);
-                updateReferenceImages(currentTaskId, data.progress, data.status);
+                updateReferenceImages(currentTaskId, data.progress, data.status, data.error);
                 if (lastPolledStatus !== data.status || lastRerenderStatus !== rerenderStatus) {
                     lastPolledStatus = data.status;
                     lastRerenderStatus = rerenderStatus;
@@ -2219,13 +2239,14 @@
                     pollInterval = null;
                     setDownloadEnabled(false);
                     showResults();
-                } else if (data.status === 'failed' || rerenderStatus === 'failed') {
+                } else if (data.status === 'failed' || data.status === 'waiting_assets' || rerenderStatus === 'failed') {
                     clearInterval(pollInterval);
                     pollInterval = null;
                 }
                 checkAllAssetsReady();
             } catch (err) {
                 console.error(err);
+                setPageError(err && err.message ? err.message : '轮询任务状态失败');
             }
         }
 
@@ -2283,6 +2304,50 @@
                 .trim();
             if (/^(none|null|undefined)$/i.test(normalized)) return '';
             return normalized;
+        }
+
+        function normalizeTaskErrorMessage(message) {
+            if (!message) return '';
+            const normalized = String(message)
+                .replace(/\nTraceback[\s\S]*/i, '')
+                .replace(/\s+/g, ' ')
+                .trim();
+            if (/^(none|null|undefined)$/i.test(normalized)) return '';
+            return normalized;
+        }
+
+        function setPageError(message) {
+            const errorTextEl = document.getElementById('errorText');
+            const normalized = normalizeTaskErrorMessage(message);
+            if (normalized) {
+                errorTextEl.classList.remove('hidden');
+                errorTextEl.textContent = normalized;
+            } else {
+                errorTextEl.classList.add('hidden');
+                errorTextEl.textContent = '';
+            }
+        }
+
+        function renderErrorText(taskError, detail) {
+            const messages = [];
+            const taskMessage = normalizeTaskErrorMessage(taskError);
+            if (taskMessage) messages.push(taskMessage);
+
+            const assetErrors = [
+                ['主图', detail && detail.hero_motif],
+                ['纹理 1', detail && detail.texture_1],
+                ['纹理 2', detail && detail.texture_2],
+                ['纹理 3', detail && detail.texture_3],
+            ]
+                .map(([label, info]) => [label, normalizeAssetErrorMessage(info && info.error)])
+                .filter(([, message]) => !!message)
+                .map(([label, message]) => `${label}: ${message}`);
+
+            if (assetErrors.length > 0) {
+                messages.push(assetErrors.join(' | '));
+            }
+
+            setPageError(messages.join(' | '));
         }
 
         function isReferenceDeletable(type) {
@@ -2502,7 +2567,7 @@
             }
         }
 
-        async function updateReferenceImages(taskId, progress, globalStatus) {
+        async function updateReferenceImages(taskId, progress, globalStatus, taskError) {
             if (!taskId) return;
             const detail = (progress && progress.detail) || {};
 
@@ -2555,24 +2620,7 @@
             updateReferenceImageItem('texture_2', detail.texture_2, apiUrl(`/api/v1/tasks/${taskId}/textures/texture_2`), globalStatus);
             updateReferenceImageItem('texture_3', detail.texture_3, apiUrl(`/api/v1/tasks/${taskId}/textures/texture_3`), globalStatus);
 
-            const assetErrors = [
-                ['主图', detail.hero_motif],
-                ['纹理 1', detail.texture_1],
-                ['纹理 2', detail.texture_2],
-                ['纹理 3', detail.texture_3],
-            ]
-                .map(([label, info]) => [label, normalizeAssetErrorMessage(info && info.error)])
-                .filter(([, message]) => !!message)
-                .map(([label, message]) => `${label}: ${message}`);
-
-            const errorTextEl = document.getElementById('errorText');
-            if (assetErrors.length > 0) {
-                errorTextEl.classList.remove('hidden');
-                errorTextEl.textContent = assetErrors.join(' | ');
-            } else {
-                errorTextEl.classList.add('hidden');
-                errorTextEl.textContent = '';
-            }
+            renderErrorText(taskError, detail);
             checkAllAssetsReady();
         }
 
@@ -2588,7 +2636,7 @@
             if (rerenderStatus === 'running' && phase === 'completed') {
                 statusText = '已完成（重新渲染中...）';
             } else if (phase === 'waiting_assets') {
-                statusText = '等待上传资源...';
+                statusText = '等待上传资源：请上传至少 1 张纹理图，再点击“重新渲染”。';
                 pct = 40;
             } else if (phase === 'generating' && currentStep.startsWith('uploading')) {
                 statusText = '上传参考图中...';
@@ -2608,13 +2656,6 @@
             document.getElementById('statusText').textContent = statusText;
             updateWorkspaceHero(currentTaskId || '当前任务', phase, `当前状态：${statusText} 你可以在下方查看参考资产和最终输出。`);
 
-            if (data.error) {
-                document.getElementById('errorText').classList.remove('hidden');
-                document.getElementById('errorText').textContent = data.error;
-            } else if (!(data.progress && data.progress.detail)) {
-                document.getElementById('errorText').classList.add('hidden');
-                document.getElementById('errorText').textContent = '';
-            }
         }
 
         function _textureNumber(tid) {

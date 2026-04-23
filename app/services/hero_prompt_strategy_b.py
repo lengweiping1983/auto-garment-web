@@ -42,8 +42,6 @@ VISION_SYSTEM_PROMPT_B = """
 - `style`
 - `reference_fidelity`
 - `design_dna`
-- `single_texture_derivation`
-- `texture_micro_structure`
 - `hero_edge_contract`
 - `hero_texture_fusion_plan`
 - `source_images`
@@ -68,7 +66,7 @@ VISION_SYSTEM_PROMPT_B = """
       "name": "主体名",
       "type": "main_subject",
       "grade": "S|A|B|C",
-      "description": "颜色、形态、位置、占比",
+      "description": "",
       "suggested_usage": "hero_motif",
       "source_image_refs": [1],
       "geometry": {
@@ -82,10 +80,10 @@ VISION_SYSTEM_PROMPT_B = """
       },
       "garment_placement_hint": {
         "recommended_target_piece": "front_body|front_hero|none",
-        "recommended_width_ratio_in_piece": 0.30,
-        "recommended_height_ratio_in_piece": 0.28,
+        "recommended_width_ratio_in_piece": 0,
+        "recommended_height_ratio_in_piece": 0,
         "recommended_anchor": "chest_center|center|small_accent|do_not_place",
-        "anti_examples": ["full bleed", "shoulder seam crossing", "neckline crossing"]
+        "anti_examples": [""]
       }
     }
   ],
@@ -95,9 +93,9 @@ VISION_SYSTEM_PROMPT_B = """
   "palette": {"primary": ["#hex"], "secondary": ["#hex"], "accent": ["#hex"], "dark": ["#hex"]},
   "style": {"medium": "", "brush_quality": "", "mood": "", "pattern_density": "low|medium|high", "line_style": "", "overall_impression": ""},
   "reference_fidelity": {
-    "must_preserve": ["主体身份、轮廓、姿态、比例、关键颜色和局部细节"],
-    "may_simplify": ["可为了服装定位图简化的细节"],
-    "must_not_change": ["不得替换成泛化主体或新角色"]
+    "must_preserve": [""],
+    "may_simplify": [""],
+    "must_not_change": [""]
   },
   "design_dna": {
     "shared_palette": ["#hex"],
@@ -108,37 +106,9 @@ VISION_SYSTEM_PROMPT_B = """
     "negative_space": "",
     "fusion_rule": ""
   },
-  "single_texture_derivation": {
-    "texture_1": "参考用户上传图中的整体风格、背景气质、色彩关系和已有纹理线索，设计或复刻一套适合衣服使用的平铺纹理图案方案 A。它不能包含完整主体、中心大图案、场景或文字，必须由小尺度 repeat 元素组成。texture_1 应从参考图中提炼第一套清晰独立的视觉家族或组织方式，形成自然、松散、较通透的重复节奏；它需要与 texture_2、texture_3 明显不同，差异应来自图案组织方式、元素关系、节奏结构或视觉家族，而不是只靠尺寸、疏密或同一语言的轻微变化。",
-    "texture_2": "参考用户上传图中的整体风格、背景气质、色彩关系和已有纹理线索，设计或复刻一套适合衣服使用的平铺纹理图案方案 B。它不能包含完整主体、中心大图案、场景或文字，必须由小尺度 repeat 元素组成。texture_2 应从参考图中提炼第二套清晰独立的视觉家族或组织方式，形成自然、松散、较通透的重复节奏；它需要与 texture_1、texture_3 明显不同，差异应来自图案组织方式、元素关系、节奏结构或视觉家族，而不是只靠尺寸、疏密或同一语言的轻微变化。",
-    "texture_3": "参考用户上传图中的整体风格、背景气质、色彩关系和已有纹理线索，设计或复刻一套适合衣服使用的平铺纹理图案方案 C。它不能包含完整主体、中心大图案、场景或文字，必须由小尺度 repeat 元素组成。texture_3 应从参考图中提炼第三套清晰独立的视觉家族或组织方式，形成自然、松散、较通透的重复节奏；它需要与 texture_1、texture_2 明显不同，差异应来自图案组织方式、元素关系、节奏结构或视觉家族，而不是只靠尺寸、疏密或同一语言的轻微变化。"
-  },
-  "texture_micro_structure": {
-    "texture_1": {
-      "motif_scale_guidance": "重复元素保持偏小，组织方式清晰但不厚重",
-      "density_guidance": "节奏自然、松散、较通透，避免堆积感",
-      "negative_space_guidance": "留出更轻松的负空间，让重复关系更透气",
-      "repeat_unit_description": "具体写出 主底纹方案 A 重复组织方式如何建立协调的 repeat 节奏",
-      "element_bias": "可在 botanical、geometric、linework 之间自由组织，但必须由参考图决定最终语言"
-    },
-    "texture_2": {
-      "motif_scale_guidance": "重复元素保持偏小，组织方式清晰但不厚重",
-      "density_guidance": "节奏自然、松散、较通透，避免堆积感",
-      "negative_space_guidance": "留出更轻松的负空间，让重复关系更透气",
-      "repeat_unit_description": "具体写出 主底纹方案 B 重复组织方式如何建立协调的 repeat 节奏",
-      "element_bias": "可在 botanical、geometric、linework 之间自由组织，但必须由参考图决定最终语言"
-    },
-    "texture_3": {
-      "motif_scale_guidance": "重复元素保持偏小，组织方式清晰但不厚重",
-      "density_guidance": "节奏自然、松散、较通透，避免堆积感",
-      "negative_space_guidance": "留出更轻松的负空间，让重复关系更透气",
-      "repeat_unit_description": "具体写出 主底纹方案 C 重复组织方式如何建立协调的 repeat 节奏",
-      "element_bias": "可在 botanical、geometric、linework 之间自由组织，但必须由参考图决定最终语言"
-    }
-  },
   "hero_edge_contract": {
-    "min_margin_ratio": 0.30,
-    "edge_fade_pixels": "2-6px soft anti-aliased edge only",
+    "min_margin_ratio": 0,
+    "edge_fade_pixels": "",
     "forbidden_alpha_patterns": ["gradient halo", "semi-transparent halo around subject", "colored fringe on edge", "feathered edge wider than 8px"],
     "required_alpha_behavior": "keep the subject contour clean and readable on a pure white solid background without halo, fringe, or artificial transparency artifacts"
   },
@@ -146,11 +116,11 @@ VISION_SYSTEM_PROMPT_B = """
   "source_images": [{"index": 1, "path": "/absolute/path/to/image.png", "role": "primary"}],
   "fusion_strategy": {"primary_reference": 1, "hero_subject_source": [1], "palette_sources": [1], "style_sources": [1], "strategy_note": ""},
   "theme_to_piece_strategy": {
-    "base_atmosphere": "大身低噪底纹如何继承主题色彩/氛围，不直接复制主体",
-    "hero_motif": "组合主卖点元素，建议放置在前片/指定 hero 裁片；如果 dominant_objects 中有多个 S/A 级 hero_motif，必须组合保留，不要三选一，并让主体之间保持可见间距，不要贴在一起",
-    "accent_details": "小花、叶片、蘑菇等只作小面积点缀",
-    "quiet_zones": "袖片、后片、领口、窄条等需要安静处理的区域",
-    "do_not_use_as_full_body_texture": ["不适合大面积满版的具象元素"]
+    "base_atmosphere": "",
+    "hero_motif": "如果 dominant_objects 中有多个 S/A 级 hero_motif，必须组合保留，不要三选一，并让主体之间保持可见间距，不要贴在一起",
+    "accent_details": "",
+    "quiet_zones": "",
+    "do_not_use_as_full_body_texture": [""]
   },
   "prompt_quality_check": {
     "texture_passed": false,
@@ -160,10 +130,33 @@ VISION_SYSTEM_PROMPT_B = """
     "hero_violations": []
   },
   "generated_prompts": {
+    "texture_micro_structure": {
+      "texture_1": {
+        "motif_scale_guidance": "具体写出 纹理图案方案 A 重复元素组织方式",
+        "density_guidance": "",
+        "negative_space_guidance": "",
+        "repeat_unit_description": "具体写出 纹理图案方案 A 重复组织方式如何建立协调的 repeat 节奏",
+        "element_bias": ""
+      },
+      "texture_2": {
+        "motif_scale_guidance": "具体写出 纹理图案方案 B 重复元素组织方式",
+        "density_guidance": "",
+        "negative_space_guidance": "",
+        "repeat_unit_description": "具体写出 纹理图案方案 B 重复组织方式如何建立协调的 repeat 节奏",
+        "element_bias": ""
+      },
+      "texture_3": {
+        "motif_scale_guidance": "具体写出 纹理图案方案 C 重复元素组织方式",
+        "density_guidance": "",
+        "negative_space_guidance": "",
+        "repeat_unit_description": "具体写出 纹理图案方案 C 重复组织方式如何建立协调的 repeat 节奏",
+        "element_bias": ""
+      }
+    },
     "hero_motif_1": "英文 white-background foreground hero motif prompt。结构要求：先写主体观察段（覆盖 identity/pose/expression/hair/clothing/props/accessories/composition/art_style_details 全部9维），再接白底定位图格式约束。必须：1) preserve and recreate the primary subject from reference image；2) complete uncropped subject, full head and hair visible；3) pure white solid background；4) clean crisp edges with no halo / no colored fringe；5) no shadow, no floor, no scenery, no garden, no foliage, no painted wash, no vignette；6) apparel placement graphic, apparel-safe print graphic",
-    "texture_1": "输出一个最终英文正向 prompt，直接可用于图像生成。它必须是一句或数句流畅自然的成品 prompt，不是规格说明、不是分析、不是 checklist、不是参数表；不要输出字段名、标签、百分比、范围、配比、JSON 风格结构，也不要复述本任务要求。只描述最终可见的纯图案本身，不要解释过程，不要写中文，不要写任何元说明。必须写成英文 seamless tileable visible repeat pattern prompt，从当前参考图中提炼第一套清晰不同的视觉家族或组织方式。不能有任何主体，不能是大图案，不能写成 hero、badge、sticker、placement graphic 或中心构图，必须由适合衣服使用的小尺度 repeat 元素组成。texture_1 必须与 texture_2、texture_3 明显不同，但差异主要来自当前图片中的另一类视觉组织方式，而不是只靠尺寸与疏密变化；它应呈现小型重复元素、稳定节奏、较通透的负空间，但这些约束只能通过自然英文描述隐含表达，不能写成数字条目。可以在 botanical、geometric、linework 之间自由组织，但应由参考图决定最终语言。禁止写成 abstract wash、plain texture、paper grain only、gradient、empty background、tonal atmosphere only、blurred background、scene、landscape。",
-    "texture_2": "输出一个最终英文正向 prompt，直接可用于图像生成。它必须是一句或数句流畅自然的成品 prompt，不是规格说明、不是分析、不是 checklist、不是参数表；不要输出字段名、标签、百分比、范围、配比、JSON 风格结构，也不要复述本任务要求。只描述最终可见的纯图案本身，不要解释过程，不要写中文，不要写任何元说明。必须写成英文 seamless tileable visible repeat pattern prompt，从当前参考图中提炼第二套清晰不同的视觉家族或组织方式。不能有任何主体，不能是大图案，不能写成 hero、badge、sticker、placement graphic 或中心构图，必须由适合衣服使用的小尺度 repeat 元素组成。texture_2 必须与 texture_1、texture_3 明显不同，但差异主要来自当前图片中的另一类视觉组织方式，而不是只靠尺寸与疏密变化；它应呈现小型重复元素、稳定节奏、较通透的负空间，但这些约束只能通过自然英文描述隐含表达，不能写成数字条目。可以在 botanical、geometric、linework 之间自由组织，但应由参考图决定最终语言。禁止写成 abstract wash、plain texture、paper grain only、gradient、empty background、tonal atmosphere only、blurred background、scene、landscape。",
-    "texture_3": "输出一个最终英文正向 prompt，直接可用于图像生成。它必须是一句或数句流畅自然的成品 prompt，不是规格说明、不是分析、不是 checklist、不是参数表；不要输出字段名、标签、百分比、范围、配比、JSON 风格结构，也不要复述本任务要求。只描述最终可见的纯图案本身，不要解释过程，不要写中文，不要写任何元说明。必须写成英文 seamless tileable visible repeat pattern prompt，从当前参考图中提炼第三套清晰不同的视觉家族或组织方式。不能有任何主体，不能是大图案，不能写成 hero、badge、sticker、placement graphic 或中心构图，必须由适合衣服使用的小尺度 repeat 元素组成。texture_3 必须与 texture_1、texture_2 明显不同，但差异主要来自当前图片中的另一类视觉组织方式，而不是只靠尺寸与疏密变化；它应呈现小型重复元素、稳定节奏、较通透的负空间，但这些约束只能通过自然英文描述隐含表达，不能写成数字条目。可以在 botanical、geometric、linework 之间自由组织，但应由参考图决定最终语言。禁止写成 abstract wash、plain texture、paper grain only、gradient、empty background、tonal atmosphere only、blurred background、scene、landscape。"
+    "texture_1": "按照用户的需求与参考图中的整体风格、背景气质、色彩关系和图中的纹理线索，你需要大胆创新，并设计或复刻一套适合衣服使用的平铺纹理图案方案 A。它不能包含主体、大图案、场景或文字，必须由小尺度 repeat 元素组成。texture_1 应从参考图中提炼第一套清晰独立的视觉家族或组织方式，形成自然、松散、较通透的重复节奏；它需要与 texture_2、texture_3 明显不同，差异应来自图案组织方式、元素关系、节奏结构或视觉家族，而不是只靠尺寸、疏密或同一语言的轻微变化。输出一个最终英文正向 prompt，直接可用于图像生成。它必须是一句或数句流畅自然的成品 prompt，不是规格说明、不是分析、不是 checklist、不是参数表；不要输出字段名、标签、百分比、范围、配比、JSON 风格结构，也不要复述本任务要求。只描述最终可见的纯图案本身，不要解释过程，不要写中文，不要写任何元说明。必须写成英文 seamless tileable visible repeat pattern prompt，必须由适合衣服使用的小尺度 repeat 元素组成。texture_1 必须与 texture_2、texture_3 明显不同，但差异主要来自当前图片中的另一类视觉组织方式，而不是只靠尺寸与疏密变化；它应呈现小型重复元素、稳定节奏、较通透的负空间，但这些约束只能通过自然英文描述隐含表达，不能写成数字条目。禁止写成 abstract wash、plain texture、paper grain only、gradient、empty background、tonal atmosphere only、blurred background、scene、landscape。",
+    "texture_2": "按照用户的需求与参考图中的整体风格、背景气质、色彩关系和图中的纹理线索，你需要大胆创新，并设计或复刻一套适合衣服使用的平铺纹理图案方案 B。它不能包含主体、大图案、场景或文字，必须由小尺度 repeat 元素组成。texture_2 应从参考图中提炼第二套清晰独立的视觉家族或组织方式，形成自然、松散、较通透的重复节奏；它需要与 texture_1、texture_3 明显不同，差异应来自图案组织方式、元素关系、节奏结构或视觉家族，而不是只靠尺寸、疏密或同一语言的轻微变化。输出一个最终英文正向 prompt，直接可用于图像生成。它必须是一句或数句流畅自然的成品 prompt，不是规格说明、不是分析、不是 checklist、不是参数表；不要输出字段名、标签、百分比、范围、配比、JSON 风格结构，也不要复述本任务要求。只描述最终可见的纯图案本身，不要解释过程，不要写中文，不要写任何元说明。必须写成英文 seamless tileable visible repeat pattern prompt，必须由适合衣服使用的小尺度 repeat 元素组成。texture_2 必须与 texture_1、texture_3 明显不同，但差异主要来自当前图片中的另一类视觉组织方式，而不是只靠尺寸与疏密变化；它应呈现小型重复元素、稳定节奏、较通透的负空间，但这些约束只能通过自然英文描述隐含表达，不能写成数字条目。禁止写成 abstract wash、plain texture、paper grain only、gradient、empty background、tonal atmosphere only、blurred background、scene、landscape。",
+    "texture_3": "按照用户的需求与参考图中的整体风格、背景气质、色彩关系和图中的纹理线索，你需要大胆创新，并设计或复刻一套适合衣服使用的平铺纹理图案方案 C。它不能包含主体、大图案、场景或文字，必须由小尺度 repeat 元素组成。texture_3 应从参考图中提炼第三套清晰独立的视觉家族或组织方式，形成自然、松散、较通透的重复节奏；它需要与 texture_1、texture_2 明显不同，差异应来自图案组织方式、元素关系、节奏结构或视觉家族，而不是只靠尺寸、疏密或同一语言的轻微变化。输出一个最终英文正向 prompt，直接可用于图像生成。它必须是一句或数句流畅自然的成品 prompt，不是规格说明、不是分析、不是 checklist、不是参数表；不要输出字段名、标签、百分比、范围、配比、JSON 风格结构，也不要复述本任务要求。只描述最终可见的纯图案本身，不要解释过程，不要写中文，不要写任何元说明。必须写成英文 seamless tileable visible repeat pattern prompt，必须由适合衣服使用的小尺度 repeat 元素组成。texture_3 必须与 texture_1、texture_2 明显不同，但差异主要来自当前图片中的另一类视觉组织方式，而不是只靠尺寸与疏密变化；它应呈现小型重复元素、稳定节奏、较通透的负空间，但这些约束只能通过自然英文描述隐含表达，不能写成数字条目。禁止写成 abstract wash、plain texture、paper grain only、gradient、empty background、tonal atmosphere only、blurred background、scene、landscape。"
   }
 }
 ```
@@ -188,7 +181,7 @@ VISION_SYSTEM_PROMPT_B = """
    - 如果 `dominant_objects` 中有多个 `grade in {S, A}` 且 `suggested_usage = hero_motif` 的主体，
      `theme_to_piece_strategy.hero_motif` 必须明确写出：组合保留全部主体，不要三选一；主体之间保留可见留白和呼吸感，不要贴合、重叠或共边。
 
-6. `reference_fidelity` / `design_dna` / `single_texture_derivation` / `hero_texture_fusion_plan`
+6. `reference_fidelity` / `design_dna` / `hero_texture_fusion_plan`
    - 明确主图必须保留什么。
 
 7. `hero_edge_contract`
@@ -362,7 +355,7 @@ def _prepare_visual_for_scheme_b(visual: dict) -> dict:
         subject_names = [item[3] for item in hero_subjects if item[3]]
         if subject_names:
             theme_strategy["hero_motif"] = (
-                "组合主卖点定位图案：保留并组合 "
+                "保留并组合 "
                 + "、".join(subject_names)
                 + "，形成一个可前片定位的白底主图，不做三选一；主体之间保持清晰可见的间距和呼吸感，不要贴合、重叠或连成一个外轮廓。"
             )

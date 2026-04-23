@@ -270,7 +270,7 @@ class HeroPromptStrategyA(HeroPromptStrategy):
         generated_prompts = visual.get("generated_prompts", {})
         texture_ids = ["hero_motif_1", "texture_1", "texture_2", "texture_3"]
         meta = {
-            "hero_motif_1": ("AI生成主图白底定位图案", "single_hero", "hero_motif_1"),
+            "hero_motif_1": ("AI生成主图白底图案", "single_hero", "hero_motif_1"),
             "texture_1": ("纹理1", "single_texture", "base_texture"),
             "texture_2": ("纹理2", "single_texture", "base_texture"),
             "texture_3": ("纹理3", "single_texture", "base_texture"),

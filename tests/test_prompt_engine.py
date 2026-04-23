@@ -57,7 +57,7 @@ def test_hero_prompt_scheme_a_keeps_pure_white_background(tmp_path: Path) -> Non
     assert "transparent" not in hero_prompt
     assert "alpha background" not in hero_prompt
     assert "cutout" not in hero_prompt
-    assert hero_entry["purpose"] == "AI生成主图白底定位图案"
+    assert hero_entry["purpose"] == "AI生成主图白底图案"
 
 
 def test_hero_prompt_scheme_b_uses_white_background_and_keeps_a_textures(tmp_path: Path) -> None:

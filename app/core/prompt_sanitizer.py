@@ -198,7 +198,6 @@ class PromptSanitizationResult:
     original_text: str
     sanitized_text: str
     domain: str
-    prompt_role: str
     removed: list[str]
     replacements: list[dict[str, str]]
     categories: list[str]
@@ -265,24 +264,18 @@ BLUR_RISK_WORDS = frozenset({
     "distressed", "stipple", "blotchy", "hazy", "foggy", "dreamy", "ethereal", "misty", "fuzzy",
 })
 
-# 这些词在 negative prompt 中是合法的反模糊禁止语，在 positive 中才是风险
-BLUR_RISK_WORDS_POSITIVE_ONLY = frozenset({
+BLUR_RISK_WORDS_EXTRA = frozenset({
     "vignette", "smudged", "smeared", "muddy",
 })
 
-# 用于 negative prompt 的增强反模糊词
-ANTI_BLUR_NEGATIVE_ADDONS = (
-    "blurry, out of focus, smeared, smudged, vignette, "
-    "distorted, deformed, low quality, jpeg artifacts, grainy"
+TEXT_ARTIFACT_PATTERNS = (
+    r"(?:with\s+)?handwritten\s+text",
+    r"decorative\s+letters",
+    r"typography\s+and\s+watermark",
+    r"(?<!\bno\s)(?<!\bwithout\s)\btypography\b",
+    r"(?<!\bno\s)(?<!\bwithout\s)\bwatermark\b",
+    r"(?<!\bno\s)(?<!\bwithout\s)\blogo\b",
 )
-
-NEGATIVE_PROMPT_KEEP_HINTS = (
-    "quality", "artifact", "blurr", "out of focus", "smear", "smudge",
-    "grain", "distort", "deform", "watermark", "logo", "text", "letter",
-    "typography", "caption", "title", "shadow", "wrinkle", "fold", "crease",
-    "gradient", "scene", "landscape", "background",
-)
-
 
 def _is_in_negation_span(lower_text: str, target_word: str, word_index: int) -> bool:
     """检查目标词是否处于 no/without 引导的否定范围内。
@@ -318,12 +311,11 @@ def _is_in_negation_span(lower_text: str, target_word: str, word_index: int) -> 
     return False
 
 
-def detect_blur_risks(text: str, prompt_role: str = "positive") -> list[str]:
+def detect_blur_risks(text: str) -> list[str]:
     """检测 prompt 中可能导致图像糊化/模糊的词语，返回风险词列表。
     
     Args:
         text: 输入 prompt 文本
-        prompt_role: "positive" 或 "negative". negative prompt 中反模糊禁止语不算风险.
     
     自动排除 'no xxx' / 'without xxx' / 'no xxx or yyy' 否定结构中的词。
     """
@@ -354,8 +346,7 @@ def detect_blur_risks(text: str, prompt_role: str = "positive") -> list[str]:
             if _is_in_negation_span(lower, word, i):
                 continue
             risks.append(word)
-        # positive-only 风险词
-        if prompt_role == "positive" and word in BLUR_RISK_WORDS_POSITIVE_ONLY and word not in risks:
+        if word in BLUR_RISK_WORDS_EXTRA and word not in risks:
             if _is_in_negation_span(lower, word, i):
                 continue
             risks.append(word)
@@ -383,6 +374,10 @@ def sanitize_blur_risks(text: str) -> str:
         # 匹配边界或空格前后的短语
         pattern = re.compile(re.escape(phrase), re.IGNORECASE)
         out = pattern.sub(_repl, out)
+    for word in sorted(BLUR_RISK_WORDS | BLUR_RISK_WORDS_EXTRA, key=len, reverse=True):
+        out = re.sub(r"\b" + re.escape(word) + r"\b", "", out, flags=re.IGNORECASE)
+    for pattern in TEXT_ARTIFACT_PATTERNS:
+        out = re.sub(pattern, "", out, flags=re.IGNORECASE)
     # 清理多余空格和标点
     out = re.sub(r"\s+", " ", out)
     out = re.sub(r"\s+([,.;:!?])", r"\1", out)
@@ -438,7 +433,7 @@ def _clean_joined_text(text: str) -> str:
     return text.strip(" ,;")
 
 
-def _strip_config_high_risk_terms(text: str, prompt_role: str = "positive") -> str:
+def _strip_config_high_risk_terms(text: str) -> str:
     """Remove or neutralize config-defined high-risk terms before image submission."""
     if not text:
         return text
@@ -446,16 +441,7 @@ def _strip_config_high_risk_terms(text: str, prompt_role: str = "positive") -> s
     out = text
     for term in _config_high_risk_terms():
         pattern = r"\b" + re.escape(term).replace(r"\ ", r"\s+") + r"\b"
-        if prompt_role == "negative":
-            # Negative prompts should avoid spelling out sensitive categories at all.
-            out = re.sub(
-                r"(?:\b(?:no|without)\b\s+)?" + pattern,
-                "",
-                out,
-                flags=re.IGNORECASE,
-            )
-        else:
-            out = re.sub(pattern, "", out, flags=re.IGNORECASE)
+        out = re.sub(pattern, "", out, flags=re.IGNORECASE)
 
     out = re.sub(r"\b(?:no|without)\b\s*(?=(?:,|;|\.|$))", "", out, flags=re.IGNORECASE)
     return _clean_joined_text(out)
@@ -476,64 +462,35 @@ def _dedupe_comma_chunks(text: str) -> str:
     return ", ".join(unique)
 
 
-def _filter_negative_chunks_for_image_generation(text: str, strict: bool = False) -> str:
-    if not text:
-        return text
-    chunks = [chunk.strip() for chunk in re.split(r"\s*,\s*", text) if chunk.strip()]
-    if not strict:
-        return _dedupe_comma_chunks(", ".join(chunks))
-
-    keep_chunks = []
-    for chunk in chunks:
-        lowered = chunk.lower()
-        if any(term in lowered for term in NEGATIVE_PROMPT_KEEP_HINTS):
-            keep_chunks.append(chunk)
-    return _dedupe_comma_chunks(", ".join(keep_chunks))
-
-
-def normalize_image_generation_prompt(text: str, prompt_role: str = "positive", strict: bool = False) -> str:
+def normalize_image_generation_prompt(text: str, strict: bool = False) -> str:
     """Single entrypoint for prompts that will actually be sent to image vendors."""
     if not text or not isinstance(text, str):
         return text
 
-    out = sanitize_prompt(text, domain="fashion", prompt_role=prompt_role)
-    if prompt_role != "negative":
-        out = sanitize_blur_risks(out)
+    out = sanitize_prompt(text, domain="fashion")
+    out = sanitize_blur_risks(out)
 
     phrase_rewrites = _config_phrase_rewrites() or IMAGE_SAFE_PHRASE_REPLACEMENTS
     for pattern, replacement in phrase_rewrites:
         out = re.sub(pattern, replacement, out, flags=re.IGNORECASE)
 
     if strict:
-        out = _strip_config_high_risk_terms(out, prompt_role=prompt_role)
-
-    if prompt_role == "negative":
-        out = _filter_negative_chunks_for_image_generation(out, strict=strict)
+        out = _strip_config_high_risk_terms(out)
 
     return _dedupe_comma_chunks(_clean_joined_text(_dedupe_comma_chunks(out)))
 
 
-def prepare_image_generation_payload(prompt: str, negative_prompt: str = "", strict: bool = False) -> tuple[str, str]:
-    """Return normalized positive/negative prompts for one image generation request."""
-    return (
-        normalize_image_generation_prompt(prompt, prompt_role="positive", strict=strict),
-        normalize_image_generation_prompt(negative_prompt, prompt_role="negative", strict=strict),
-    )
-
-
-def sanitize_prompt_for_strict_image_safety(text: str, prompt_role: str = "positive") -> str:
+def sanitize_prompt_for_strict_image_safety(text: str) -> str:
     """Stricter final pass used when image vendors reject prompts for sensitive wording."""
-    return normalize_image_generation_prompt(text, prompt_role=prompt_role, strict=True)
+    return normalize_image_generation_prompt(text, strict=True)
 
 
-def sanitize_prompt_with_report(text: str, domain: str = "generic", prompt_role: str = "positive") -> PromptSanitizationResult:
+def sanitize_prompt_with_report(text: str, domain: str = "generic") -> PromptSanitizationResult:
     """过滤提示词并返回审计报告。
 
     Args:
         text: 输入提示词
         domain: 领域上下文。"generic" 使用完整停用词表；"fashion" 保留审美关键词
-        prompt_role: positive/negative/final。negative 会更激进地避免列举敏感词。
-
     规则：
     1. 拆分单词，按空格和标点分隔
     2. 检测停用词和禁用词，移除
@@ -545,7 +502,6 @@ def sanitize_prompt_with_report(text: str, domain: str = "generic", prompt_role:
             original_text=text,
             sanitized_text=text,
             domain=domain,
-            prompt_role=prompt_role,
             removed=[],
             replacements=[],
             categories=[],
@@ -567,7 +523,7 @@ def sanitize_prompt_with_report(text: str, domain: str = "generic", prompt_role:
         if category:
             categories.add(category)
             replacement = SAFE_TOKEN_REPLACEMENTS.get(stripped)
-            if replacement and prompt_role != "negative":
+            if replacement:
                 prefix = token[:len(token) - len(token.lstrip(",.;:!?()[]{}'\""))]
                 suffix = token[len(token.rstrip(",.;:!?()[]{}'\"")):]
                 safe = _token_case_like(stripped, replacement)
@@ -588,7 +544,7 @@ def sanitize_prompt_with_report(text: str, domain: str = "generic", prompt_role:
             if category:
                 categories.add(category)
             replacement = SAFE_TOKEN_REPLACEMENTS.get(stripped) or SAFE_TOKEN_REPLACEMENTS.get(banned_part)
-            if replacement and prompt_role != "negative":
+            if replacement:
                 replacements.append({"from": token, "to": replacement, "reason": category or "banned_part"})
                 cleaned.append(replacement)
             else:
@@ -620,7 +576,6 @@ def sanitize_prompt_with_report(text: str, domain: str = "generic", prompt_role:
         original_text=str(text),
         sanitized_text=result,
         domain=domain,
-        prompt_role=prompt_role,
         removed=removed,
         replacements=replacements,
         categories=sorted(categories),
@@ -628,14 +583,14 @@ def sanitize_prompt_with_report(text: str, domain: str = "generic", prompt_role:
     )
 
 
-def sanitize_prompt(text: str, domain: str = "generic", prompt_role: str = "positive") -> str:
+def sanitize_prompt(text: str, domain: str = "generic") -> str:
     """过滤提示词中的停用词、禁用词和噪音词。"""
-    return sanitize_prompt_with_report(text, domain=domain, prompt_role=prompt_role).sanitized_text
+    return sanitize_prompt_with_report(text, domain=domain).sanitized_text
 
 
-def sanitize_prompt_for_image_generation(text: str, prompt_role: str = "positive") -> str:
+def sanitize_prompt_for_image_generation(text: str) -> str:
     """Apply conservative rewrites before submitting prompts to image models."""
-    return normalize_image_generation_prompt(text, prompt_role=prompt_role, strict=False)
+    return normalize_image_generation_prompt(text, strict=False)
 
 
 def sanitize_prompts_in_dict(data: dict, keys: tuple[str, ...] = ("prompt",), domain: str = "generic") -> dict:
@@ -650,11 +605,10 @@ def sanitize_prompts_in_dict(data: dict, keys: tuple[str, ...] = ("prompt",), do
         out = {}
         for k, v in data.items():
             if k in keys and isinstance(v, str):
-                role = "negative" if k == "negative_prompt" else "positive"
                 if domain == "fashion":
-                    out[k] = normalize_image_generation_prompt(v, prompt_role=role, strict=False)
+                    out[k] = normalize_image_generation_prompt(v, strict=False)
                 else:
-                    out[k] = sanitize_prompt(v, domain=domain, prompt_role=role)
+                    out[k] = sanitize_prompt(v, domain=domain)
             else:
                 out[k] = sanitize_prompts_in_dict(v, keys=keys, domain=domain)
         return out

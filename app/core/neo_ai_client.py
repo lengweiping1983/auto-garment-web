@@ -67,7 +67,6 @@ class NeoAIClient:
     async def submit_generation(
         self,
         prompt: str,
-        negative_prompt: str = "",
         model: str = "",
         size: str = "",
         reference_images: list[str] | None = None,

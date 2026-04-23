@@ -215,7 +215,7 @@ def test_scheme_b_many_subjects_keep_all_subjects_separated_for_cutout(tmp_path:
     assert strategy == "旧描述"
 
 
-def test_texture_prompts_strip_text_and_blur_risks_without_relying_on_negative_prompt(tmp_path: Path) -> None:
+def test_texture_prompts_strip_text_and_blur_risks_in_positive_prompt(tmp_path: Path) -> None:
     visual = {
         "generated_prompts": {
             "hero_motif_1": "clean hero subject",
@@ -229,7 +229,6 @@ def test_texture_prompts_strip_text_and_blur_risks_without_relying_on_negative_p
     texture_1_prompt = prompt_map["texture_1"].lower()
     texture_2_prompt = prompt_map["texture_2"].lower()
     texture_3_prompt = prompt_map["texture_3"].lower()
-    texture_1_entry = next(item for item in texture_prompts["prompts"] if item["texture_id"] == "texture_1")
 
     assert "dreamy" not in texture_1_prompt
     assert "hazy" not in texture_1_prompt
@@ -238,13 +237,15 @@ def test_texture_prompts_strip_text_and_blur_risks_without_relying_on_negative_p
     assert ", watermark" not in texture_3_prompt
     assert "decorative letters" not in texture_2_prompt
     assert "typography and watermark" not in texture_3_prompt
-    assert "no soft focus" in texture_1_prompt
+    assert "soft focus" not in texture_1_prompt
+    assert "bokeh" not in texture_1_prompt
     assert "no logo" in texture_1_prompt
     assert "no watermark" in texture_3_prompt
     assert "crisp clean repeat edges" in texture_1_prompt
     assert "sharp motif boundaries" in texture_1_prompt
     assert "high print legibility" in texture_3_prompt
-    assert texture_1_entry["negative_prompt"], "negative prompt may still exist, but positive prompt must already be hardened"
+    removed_key = "negative" + "_prompt"
+    assert all(removed_key not in item for item in texture_prompts["prompts"])
 
 
 def test_invalid_hero_prompt_scheme_raises(tmp_path: Path) -> None:

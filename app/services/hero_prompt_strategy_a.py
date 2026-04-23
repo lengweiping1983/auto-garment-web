@@ -5,13 +5,13 @@ from __future__ import annotations
 from pathlib import Path
 import re
 
-from app.core.prompt_blocks import HERO_NEGATIVE_EN, PANEL_DEFAULTS_EN, TEXTURE_NEGATIVE_EN
+from app.core.prompt_blocks import PANEL_DEFAULTS_EN
 
 from app.services.hero_prompt_strategy_base import (
     HeroPromptStrategy,
     clean_prompt_text,
     dedupe_prompt_chunks,
-    prepare_image_generation_payload,
+    normalize_image_generation_prompt,
 )
 
 
@@ -137,9 +137,9 @@ VISION_SYSTEM_PROMPT_A = """
   },
   "generated_prompts": {
     "hero_motif_1": "一个最终英文正向 prompt，长度约100-220词，直接可用于图像生成。基于 struct 中主主体与次主体信息，只描述最终要生成的定位印花主体，不要解释过程，不要写中文，不要写提示语说明。用途是商业上装的白底定位印花（placement print），不是海报、贴纸、包装图或整件服装效果图。必须写入：主体精确类别与数量、整体轮廓与体量、主色/辅色/点缀色及近似 HEX、主体自身材质与表面光学特性、姿态动作朝向、关键纹样与边缘特征。若主体本身可透光或半透明，只能描述主体自身质感，绝不能把背景写成透明。必须原样包含这些短语：isolated foreground subject only, pure white background, no shadow, no floor, no scenery, no extra objects, no text, no logo, no watermark, centered complete subject, full uncropped figure, clean crisp edges, apparel placement graphic, apparel-safe print graphic。禁止出现：transparent background, alpha background, PNG cutout, background removal, checkerboard preview, fake transparency grid, sticker cutout, isolated on transparent, seamless, tileable, repeat pattern, all-over print, fabric swatch, wallpaper, packaging paper, garment mockup, fashion model, mannequin, person wearing garment, 3D render。",
-    "texture_1": "一个最终英文正向 prompt，直接可用于图像生成。它对应 main，表示面积最大的主底纹。必须从参考图提炼主面料的背景色、笔触和小型 repeat 元素，只描述纯图案本身，不要解释过程，不要写中文，不要写任何元说明。必须写成英文 seamless tileable visible repeat pattern prompt，并明确写出具体小元素名称，如 botanical / geometric / line / dot。必须包含 motif_scale_relative、density_estimate、negative_space_ratio 三项，且要落到数值：elements are 3-8% of tile width，12-20 elements per tile，45-55% breathing room。element_type_mix 应偏向 botanical 0.6 / geometric_dot 0.3 / organic_line 0.1。必须与 texture_2、texture_3 共享同一 palette 和 brush language。禁止写成 abstract wash、plain texture、paper grain only、gradient、empty background、tonal atmosphere only、blurred background、scene、landscape。",
-    "texture_2": "一个最终英文正向 prompt，直接可用于图像生成。它对应 secondary，表示与 texture_1 协调的次级图案或辅助纹理。必须从参考图提炼辅面料的协调小元素、线条或格纹结构，只描述纯图案本身，不要解释过程，不要写中文，不要写任何元说明。必须写成英文 coordinating seamless tileable visible repeat pattern prompt，明确写出协调 repeat 结构，如 lattice / linework / leaves / dots / geometric。必须包含 motif_scale_relative、density_estimate、negative_space_ratio 三项，且要落到数值：elements are 2-6% of tile width，15-25 elements per tile，50-60% breathing room。element_type_mix 应偏向 botanical 0.4 / geometric 0.4 / organic_line 0.2。必须与 texture_1 共享同一 palette 和 brush language。禁止写成 abstract wash、plain texture、paper grain only、gradient、empty background、tonal atmosphere only、scene。",
-    "texture_3": "一个最终英文正向 prompt，直接可用于图像生成。它对应 accent_light，表示最小尺度的轻量点缀纹理。必须从参考图提炼轻量点缀元素和小尺度 repeat，只描述纯图案本身，不要解释过程，不要写中文，不要写任何元说明。必须写成英文 small-scale accent repeat prompt，强调极小规模元素、高密度点缀但负空间充足，并且不得喧宾夺主。必须包含 motif_scale_relative、density_estimate、negative_space_ratio 三项，且要落到数值：elements are 1-4% of tile width，20-40 elements per tile，60-75% breathing room。element_type_mix 应偏向 botanical 0.3 / geometric_dot 0.5 / organic_line 0.2。必须与 texture_1、texture_2 保持同一 palette 和 brush language。禁止出现白底主体、模特、穿着效果、场景，或任何会让图案抢走主视觉的描述。"
+    "texture_1": "输出一个最终英文正向 prompt，直接可用于图像生成。它必须是一句或数句流畅自然的成品 prompt，不是规格说明、不是分析、不是 checklist、不是参数表；不要输出字段名、标签、百分比、范围、配比、JSON 风格结构，也不要复述本任务要求。只描述最终可见的纯图案本身，不要解释过程，不要写中文，不要写任何元说明。必须写成英文 seamless tileable visible repeat pattern prompt，从当前参考图中提炼第一套清晰不同的视觉家族或组织方式。不能有任何主体，不能是大图案，不能写成 hero、badge、sticker、placement graphic 或中心构图，必须由适合衣服使用的小尺度 repeat 元素组成。texture_1 必须与 texture_2、texture_3 明显不同，但差异主要来自当前图片中的另一类视觉组织方式，而不是只靠尺寸与疏密变化；它应呈现小型重复元素、稳定节奏、较通透的负空间，但这些约束只能通过自然英文描述隐含表达，不能写成数字条目。可以在 botanical、geometric、linework 之间自由组织，但应由参考图决定最终语言。禁止写成 abstract wash、plain texture、paper grain only、gradient、empty background、tonal atmosphere only、blurred background、scene、landscape。",
+    "texture_2": "输出一个最终英文正向 prompt，直接可用于图像生成。它必须是一句或数句流畅自然的成品 prompt，不是规格说明、不是分析、不是 checklist、不是参数表；不要输出字段名、标签、百分比、范围、配比、JSON 风格结构，也不要复述本任务要求。只描述最终可见的纯图案本身，不要解释过程，不要写中文，不要写任何元说明。必须写成英文 seamless tileable visible repeat pattern prompt，从当前参考图中提炼第二套清晰不同的视觉家族或组织方式。不能有任何主体，不能是大图案，不能写成 hero、badge、sticker、placement graphic 或中心构图，必须由适合衣服使用的小尺度 repeat 元素组成。texture_2 必须与 texture_1、texture_3 明显不同，但差异主要来自当前图片中的另一类视觉组织方式，而不是只靠尺寸与疏密变化；它应呈现小型重复元素、稳定节奏、较通透的负空间，但这些约束只能通过自然英文描述隐含表达，不能写成数字条目。可以在 botanical、geometric、linework 之间自由组织，但应由参考图决定最终语言。禁止写成 abstract wash、plain texture、paper grain only、gradient、empty background、tonal atmosphere only、blurred background、scene、landscape。",
+    "texture_3": "输出一个最终英文正向 prompt，直接可用于图像生成。它必须是一句或数句流畅自然的成品 prompt，不是规格说明、不是分析、不是 checklist、不是参数表；不要输出字段名、标签、百分比、范围、配比、JSON 风格结构，也不要复述本任务要求。只描述最终可见的纯图案本身，不要解释过程，不要写中文，不要写任何元说明。必须写成英文 seamless tileable visible repeat pattern prompt，从当前参考图中提炼第三套清晰不同的视觉家族或组织方式。不能有任何主体，不能是大图案，不能写成 hero、badge、sticker、placement graphic 或中心构图，必须由适合衣服使用的小尺度 repeat 元素组成。texture_3 必须与 texture_1、texture_2 明显不同，但差异主要来自当前图片中的另一类视觉组织方式，而不是只靠尺寸与疏密变化；它应呈现小型重复元素、稳定节奏、较通透的负空间，但这些约束只能通过自然英文描述隐含表达，不能写成数字条目。可以在 botanical、geometric、linework 之间自由组织，但应由参考图决定最终语言。禁止写成 abstract wash、plain texture、paper grain only、gradient、empty background、tonal atmosphere only、blurred background、scene、landscape。"
   }
 }
 ```
@@ -170,8 +170,6 @@ VISION_SYSTEM_PROMPT_A = """
    - texture_1/2/3 的提示词**只描述纯图案本身**，严禁出现服装版型、褶皱、人体、模特、光影、场景、3D 效果。它们是"面料印花图案"，不是"穿着效果图"。
    - ✅ 正确示例: "seamless tropical leaf pattern, dense overlapping monstera and palm fronds in emerald and sage green on off-white ground, flat 2D vector style, tileable, all-over print, flat color, fabric texture"
    - ❌ 错误示例: "a dress with floral pattern, soft lighting, beautiful model, draped fabric with folds"
-   - 三个纹理之间必须保持**色彩共享**（使用相同的色板）和**风格统一**（相同的艺术表现手法），仅在图案密度、元素尺度、复杂度上拉开层次。
-   - texture_1 对应图片中**面积最大**的底纹；texture_2 对应**次要**图案或抽象变体；texture_3 对应**最小尺度**的装饰性微图案。
 
 7. **主图白底要求不得歧义（关键）**
    - hero_motif_1 必须输出为**纯白实体背景**的定位印花主体，不是透明底、不是可抠图预览、不是贴纸 cutout。
@@ -195,7 +193,7 @@ VISION_SYSTEM_PROMPT_A = """
      - `knife/blade` -> `sharp geometric motif` / `leaf-shaped motif`
      - `sexy/sensual/provocative` -> `elegant commercial` / `soft elegant` / `bold commercial`
    - 若某些主体或细节天然高风险，不要直写危险物；改写为抽象图形、颜色、材质、轮廓、 botanical / geometric motif、apparel-safe prop。
-   - negative prompt 也不能堆砌敏感词清单；应尽量使用安全的商业约束词，例如 `apparel-safe`, `no policy-risk content`, `family-friendly design language`, `apparel-safe design language`。
+   - 所有安全约束都必须写入 prompt，使用安全、商业、服装可生产的视觉语言。
    - 如果无法在不使用敏感词的情况下准确描述，就优先保留安全的形状、配色、材质、轮廓和构图信息，宁可更抽象，也不要输出危险原词。
 
 ---
@@ -272,10 +270,10 @@ class HeroPromptStrategyA(HeroPromptStrategy):
         generated_prompts = visual.get("generated_prompts", {})
         texture_ids = ["hero_motif_1", "texture_1", "texture_2", "texture_3"]
         meta = {
-            "hero_motif_1": ("AI生成主图白底定位图案", "single_hero", "hero_motif_1", HERO_NEGATIVE_EN),
-            "texture_1": ("纹理1", "single_texture", "base_texture", TEXTURE_NEGATIVE_EN),
-            "texture_2": ("纹理2", "single_texture", "base_texture", TEXTURE_NEGATIVE_EN),
-            "texture_3": ("纹理3", "single_texture", "base_texture", TEXTURE_NEGATIVE_EN),
+            "hero_motif_1": ("AI生成主图白底定位图案", "single_hero", "hero_motif_1"),
+            "texture_1": ("纹理1", "single_texture", "base_texture"),
+            "texture_2": ("纹理2", "single_texture", "base_texture"),
+            "texture_3": ("纹理3", "single_texture", "base_texture"),
         }
 
         prompts: list[dict] = []
@@ -288,14 +286,13 @@ class HeroPromptStrategyA(HeroPromptStrategy):
             if tid == "hero_motif_1":
                 raw = _ensure_white_background_hero(raw)
             raw = _merge_panel_prompt(raw, tid)
-            purpose, panel, role, negative = meta[tid]
-            cleaned, cleaned_negative = prepare_image_generation_payload(raw, negative, strict=False)
+            purpose, panel, role = meta[tid]
+            cleaned = normalize_image_generation_prompt(raw, strict=False)
             prompts.append(
                 {
                     "texture_id": tid,
                     "purpose": purpose,
                     "prompt": cleaned,
-                    "negative_prompt": cleaned_negative,
                     "panel": panel,
                     "role": role,
                 }
@@ -308,9 +305,8 @@ class HeroPromptStrategyA(HeroPromptStrategy):
             "prompts": prompts,
         }
         for item in texture_prompts.get("prompts", []):
-            item["prompt"], item["negative_prompt"] = prepare_image_generation_payload(
+            item["prompt"] = normalize_image_generation_prompt(
                 item.get("prompt", ""),
-                item.get("negative_prompt", ""),
                 strict=False,
             )
 

@@ -20,7 +20,7 @@ from pathlib import Path
 
 from app.config import settings
 from app.core.neo_ai_client import NeoAIClient
-from app.core.prompt_sanitizer import prepare_image_generation_payload
+from app.core.prompt_sanitizer import normalize_image_generation_prompt
 
 from PIL import Image, ImageStat
 from app.core.renderer import render_all, compose_preview
@@ -240,8 +240,8 @@ def _write_json(path: Path, payload: dict) -> Path:
     return path
 
 
-def _normalized_generation_payload(prompt: str, negative_prompt: str, strict: bool = False) -> tuple[str, str]:
-    return prepare_image_generation_payload(prompt, negative_prompt, strict=strict)
+def _normalized_generation_prompt(prompt: str, strict: bool = False) -> str:
+    return normalize_image_generation_prompt(prompt, strict=strict)
 
 
 def clear_rerender_outputs(task_id: str) -> None:
@@ -554,7 +554,6 @@ async def _upload_reference_image(
 async def _gen_hero(
     neo: NeoAIClient,
     prompt: str,
-    negative_prompt: str,
     ref_url: str,
     model: str,
     size: str,
@@ -569,11 +568,10 @@ async def _gen_hero(
     })
     _update_detail_field(task_id, "hero_motif", {"status": "running"})
     try:
-        safe_prompt, safe_negative = _normalized_generation_payload(prompt, negative_prompt, strict=False)
+        safe_prompt = _normalized_generation_prompt(prompt, strict=False)
         try:
             task_code = await neo.submit_generation(
                 prompt=safe_prompt,
-                negative_prompt=safe_negative,
                 model=model,
                 size=size,
                 reference_images=[ref_url] if ref_url else None,
@@ -582,10 +580,9 @@ async def _gen_hero(
             if not _is_prompt_safety_error(exc):
                 raise
             print("[RETRY] Hero prompt hit moderation, retrying with stricter sanitization...")
-            safe_prompt, safe_negative = _normalized_generation_payload(prompt, negative_prompt, strict=True)
+            safe_prompt = _normalized_generation_prompt(prompt, strict=True)
             task_code = await neo.submit_generation(
                 prompt=safe_prompt,
-                negative_prompt=safe_negative,
                 model=model,
                 size=size,
                 reference_images=[ref_url] if ref_url else None,
@@ -599,7 +596,6 @@ async def _gen_texture(
     neo: NeoAIClient,
     tid: str,
     prompt: str,
-    negative_prompt: str,
     ref_url: str,
     model: str,
     size: str,
@@ -616,11 +612,10 @@ async def _gen_texture(
     work = texture_root / tid
     work.mkdir(parents=True, exist_ok=True)
     try:
-        safe_prompt, safe_negative = _normalized_generation_payload(prompt, negative_prompt, strict=False)
+        safe_prompt = _normalized_generation_prompt(prompt, strict=False)
         try:
             task_code = await neo.submit_generation(
                 prompt=safe_prompt,
-                negative_prompt=safe_negative,
                 model=model,
                 size=size,
                 reference_images=[ref_url] if ref_url else None,
@@ -629,10 +624,9 @@ async def _gen_texture(
             if not _is_prompt_safety_error(exc):
                 raise
             print(f"[RETRY] Texture {tid} prompt hit moderation, retrying with stricter sanitization...")
-            safe_prompt, safe_negative = _normalized_generation_payload(prompt, negative_prompt, strict=True)
+            safe_prompt = _normalized_generation_prompt(prompt, strict=True)
             task_code = await neo.submit_generation(
                 prompt=safe_prompt,
-                negative_prompt=safe_negative,
                 model=model,
                 size=size,
                 reference_images=[ref_url] if ref_url else None,
@@ -1185,14 +1179,10 @@ async def run_pipeline(
         hero_task = None
         texture_tasks = {}
 
-        # Build negative prompt lookup from LLM-generated texture_prompts
-        negative_map = {p["texture_id"]: p.get("negative_prompt", "") for p in texture_prompts.get("prompts", [])}
-
         if needs_hero:
             hero_task = asyncio.create_task(_gen_hero(
                 neo,
                 prompt_map.get("hero_motif_1", ""),
-                negative_map.get("hero_motif_1", ""),
                 ref_url, model, size, hero_dir, task_id,
             ))
 
@@ -1200,7 +1190,6 @@ async def run_pipeline(
             texture_tasks[tid] = asyncio.create_task(_gen_texture(
                 neo, tid,
                 prompt_map.get(tid, ""),
-                negative_map.get(tid, ""),
                 ref_url, model, size, texture_root, task_id,
             ))
 

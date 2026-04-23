@@ -8,10 +8,10 @@ import re
 from pathlib import Path
 
 try:
-    from app.core.prompt_sanitizer import prepare_image_generation_payload
+    from app.core.prompt_sanitizer import normalize_image_generation_prompt
 except Exception:
-    def prepare_image_generation_payload(prompt, negative_prompt="", strict=False):
-        return prompt, negative_prompt
+    def normalize_image_generation_prompt(prompt, strict=False):
+        return prompt
 
 
 VALID_HERO_PROMPT_SCHEMES = {"a", "b"}

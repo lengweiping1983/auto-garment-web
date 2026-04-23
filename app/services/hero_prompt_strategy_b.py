@@ -5,13 +5,13 @@ from __future__ import annotations
 from pathlib import Path
 import re
 
-from app.core.prompt_blocks import HERO_NEGATIVE_EN, PANEL_DEFAULTS_EN, TEXTURE_NEGATIVE_EN
+from app.core.prompt_blocks import PANEL_DEFAULTS_EN
 
 from app.services.hero_prompt_strategy_base import (
     HeroPromptStrategy,
     clean_prompt_text,
     dedupe_prompt_chunks,
-    prepare_image_generation_payload,
+    normalize_image_generation_prompt,
 )
 
 
@@ -445,10 +445,10 @@ class HeroPromptStrategyB(HeroPromptStrategy):
         generated_prompts = visual.get("generated_prompts", {})
         texture_ids = ["hero_motif_1", "texture_1", "texture_2", "texture_3"]
         meta = {
-            "hero_motif_1": ("AI生成主图白底图", "single_hero", "hero_motif_1", HERO_NEGATIVE_EN),
-            "texture_1": ("纹理1", "single_texture", "base_texture", TEXTURE_NEGATIVE_EN),
-            "texture_2": ("纹理2", "single_texture", "base_texture", TEXTURE_NEGATIVE_EN),
-            "texture_3": ("纹理3", "single_texture", "base_texture", TEXTURE_NEGATIVE_EN),
+            "hero_motif_1": ("AI生成主图白底图", "single_hero", "hero_motif_1"),
+            "texture_1": ("纹理1", "single_texture", "base_texture"),
+            "texture_2": ("纹理2", "single_texture", "base_texture"),
+            "texture_3": ("纹理3", "single_texture", "base_texture"),
         }
 
         prompts: list[dict] = []
@@ -467,14 +467,13 @@ class HeroPromptStrategyB(HeroPromptStrategy):
                 # remains self-contained and does not call back into scheme A at runtime.
                 raw = _merge_texture_prompt_b(raw, tid)
 
-            purpose, panel, role, negative = meta[tid]
-            cleaned, cleaned_negative = prepare_image_generation_payload(raw, negative, strict=False)
+            purpose, panel, role = meta[tid]
+            cleaned = normalize_image_generation_prompt(raw, strict=False)
             prompts.append(
                 {
                     "texture_id": tid,
                     "purpose": purpose,
                     "prompt": cleaned,
-                    "negative_prompt": cleaned_negative,
                     "panel": panel,
                     "role": role,
                 }
@@ -487,9 +486,8 @@ class HeroPromptStrategyB(HeroPromptStrategy):
             "prompts": prompts,
         }
         for item in texture_prompts.get("prompts", []):
-            item["prompt"], item["negative_prompt"] = prepare_image_generation_payload(
+            item["prompt"] = normalize_image_generation_prompt(
                 item.get("prompt", ""),
-                item.get("negative_prompt", ""),
                 strict=False,
             )
 
